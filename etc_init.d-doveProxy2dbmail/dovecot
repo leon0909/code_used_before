@@ -1,0 +1,132 @@
+#!/bin/bash
+#
+# Startup  to startmulti instances of Dovecot standalone Server
+# is usefull to have it started like that if you want to
+# have a different dovecot configuration files for running each of them
+# for example one for dovecot-imap another for dovecot pop or dovecot-lmtp ...
+#
+# chkconfig: - 81 19
+# description: DBMail is a mail server with a database backend. Unlike \
+#	       WUimapd it does not run through inetd.
+# processname: dovecot-imapd dovecot-pop3d 
+# protocol-names: imap pop3 imaps pop3s
+# pidfile: /var/run/dovecot/dovecot-imapd.pid
+# config: /etc/dovecot-<protocol-name>.conf
+
+### BEGIN INIT INFO
+# Provides:          dovecot
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start dovecot daemon services at boot time
+# Description:       Enable dovecot-imapd dovecot-pop3d dovecot-lmtpd
+#                    services needed for the dovecot provided by daemon.
+### END INIT INFO
+
+# Source function library.
+
+if [ -f /etc/sysconfig/dovecot ]; then
+        . /etc/sysconfig/dovecot
+fi
+
+# Path to the dovecot script.
+#
+SBIN=/usr/sbin
+
+# PLEASE NOTE! the /var/sbin/dovecot-<protocol-name> wrappers are self created by me
+# so have a look at them before useing this script to start dovecot services
+#
+export wrappers="dovecot-imapd dovecot-pop3d"
+[ "pop" = "${2}" ] && export wrappers="dovecot-pop3d" && echo ${wrappers}
+[ "imap" = "${2}" ] && export wrappers="dovecot-imapd" && echo ${wrappers}
+
+LOCKDIR=/var/lock
+RUNDIR=/var/run/dovecot
+
+RETVAL=0
+
+
+start() {
+   i=$1
+   echo "Starting $i"
+   MYPPID=$(${SBIN}/${i}) 
+   if [ -z "$(echo ${MYPPID} | awk -F'-' '{print $2}')" ] ; then
+     echo  ${MYPPID} > ${RUNDIR}/${i}.pid
+     RETVAL=0
+   else 
+     echo ${MYPPID}
+     RETVAL=1
+     fi
+   ## echo " RETRIVAL IS:/".$RETVAL."/"
+   [ $RETVAL = 0 ] && touch ${LOCKDIR}/$i.lock && return $RETVAL
+   } ## END FUNCTION  .................
+stop() {
+  i=$1
+  allpids=$(ps ax | grep dovecot | grep -v grep | awk '{print $1}' | sort -r)
+  allpids=$( echo ${allpids} | cut -d ' ' -f3- )
+  [ -z "${allpids}" ] && echo " -- ${i} is stopped."
+  rm -f ${LOCKDIR}/$i.lock ${RUNDIR}/${i}.pid
+  }
+reload() {
+        i=$1
+        PIDFILE=${RUNDIR}/${i}.pid
+  	thisPid=`pgrep dovecot`
+	echo "Reloading $i: "
+        start-stop-daemon --signal HUP --stop --oknodo --quiet --pidfile ${PIDFILE} --exec /usr/sbin/${i} 
+	RETVAL=$?
+	echo
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	for i in ${wrappers}; do
+	  start $i
+          sleep 1
+          done
+	;;
+  stop)
+        allpids=$(ps ax | grep dovecot | grep -v grep | awk '{print $1}' | sort -r)
+        allpids=$( echo ${allpids} | cut -d ' ' -f3- )
+        [ -n "${allpids}" ] && echo "killing this pids:/${allpids}/" && kill -15 ${allpids}
+        sleep 1 
+        allpids=$(ps ax | grep dovecot | grep -v grep | awk '{print $1}' | sort -r)
+        allpids=$( echo ${allpids} | cut -d ' ' -f3- )
+        [ -n "${allpids}" ] && kill -9 ${allpids}
+	for i in ${wrappers}; do
+	  stop $i
+          sleep 1
+          done
+        kill -9 $allpids
+	;;
+  status)
+	for i in ${wrappers}; do
+          status $i
+	  RETVAL=$?
+          done
+	;;
+  restart)
+	stop $wrappers
+	start $wrappers
+	;;
+  condrestart)
+	for i in ${wrappers}; do
+	  if [ -f ${RUNDIR}/${i}.pid ] ; then
+	     stop $i
+	     start $i
+	     fi
+          done
+	;;
+  reload)
+	for i in ${wrappers}; do
+          reload $i
+          sleep 1
+          done
+	;;
+  *)
+	echo $"Usage: $prog {start|stop|restart|condrestart|reload|status}"
+	exit 1
+esac
+
+exit $RETVAL

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+for i in $(cat /root/template); do
+  PASS=${i//*\//}
+  EMAIL=${i//\/*/}
+  EUSER=${EMAIL//\@*/}
+  ID=$(echo "select id from virtual_users where user='"$EUSER"' ;" \
+  | mysql -B  -uemailActions -pIsa74Wuff mailserver \
+  |  tail -1)
+  BASE64=$( echo ${i}| openssl enc -base64 )
+  echo "insert into virtual_accounts (id,account,user_id) values ( NULL,'"${BASE64}"',${ID} );"
+  done

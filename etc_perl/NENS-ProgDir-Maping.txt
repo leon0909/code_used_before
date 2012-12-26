@@ -1,0 +1,109 @@
+$this->{'fieldNames'} = {
+                          '11' => 'ZIP code',
+                          '7' => 'Degree(s) available',
+                          '17' => 'Website',
+                          '2' => 'Programme Website',
+                          '1' => 'Program Name',
+                          '18' => 'Host institution',
+                          '0' => '1D',
+                          '16' => 'Coordinator\'s e-mail address',
+                          '13' => 'Contact-Person-Country',
+                          '6' => 'Duration of the program',
+                          '3' => 'Main-Keywords',
+                          '9' => 'Contact-Person-Institution-Department',
+                          '12' => 'Contact-Person City',
+                          '14' => 'Phone',
+                          '15' => 'Fax',
+                          '8' => 'Contact Person',
+                          '4' => 'Keywords',
+                          '10' => 'Contact-Person-Street',
+                          '5' => 'Program language'
+                        };
+
+Contact
+-------------
+ID                                               => nens.Contact:OwnerId /* Primary Key */
+Phone                                            => nens.Contact:Street /* See Contact Fields */
+Fax                                              => nens.Contact:Street /* See Contact Fields */
+Coordinator's e-mail address                     => nens.Contact:Email /* See Contact Fields */
+Website                                          => nens.Contact:Website /* ID, Label */
+Contact Person                                   => nens.Contact:Name /* See Contact Fields */
+Contact-Person-Street                            => nens.Contact:Street /* See Contact Fields */
+Contact-Person-Country                           => nens.City:CountryID /* Foreign Key to nens.City.CountryID */
+nens.Contact:CityID                              => nens.Contact:CityID /* Foreign Key to nens.City */
+ZIP code                                         => nens.Contact:Zipcode /* See Contact Fields */
+nens.Contact:InstitutionID                       => nens.Institution:ID /* Primary Key */
+
+Institution
+-------------
+* ID, Label,Department !SELECTBOX!->nens.Contact:InstitutionID
+nens.Institution:ID                              => nens.Institution:ID /* Primary Key */
+nens.Contact:InstitutionID                       => nens.Institution:ID /* Primary Key */
+Contact-Person-Institution-Department            => nens.Institution:Department /*
+  * ID, Label,Department !SELECTBOX!->nens.Contact:InstitutionID
+  */ 
+
+City
+-----------
+Contact-Person City                              => nens.City:Label /*
+ * ID, CountryID, Label, Coords !SELECTBOX!-> nens.Contact:CityID
+ */
+Contact-Person-Country                           => nens.Country:Label /*
+ * ID, Label, Coords !SELECTBOX!-> nens.City:CountryID
+ */
+
+nens.City:ID                                     => nens.City:ID /* Primary Key */
+Contact-Person City                              => nens.Contact:Label /* Foreign Key to nens.City */
+Contact-Person-Country                           => nens.City:CountryID /* Foreign Key to nens.City.CountryID */
+nens.City:Coords                                 => nens.City:Coords /* Primary Key */
+-----------
+
+LanguageData
+------------
+nens.Language:Label                              => nens.Language:Label
+    1. LangID = "select ID from nens.Language where Label='$<Program language>'"
+    2. if empty (LangID); then:
+            insert into nens.Language (ID,Label) values (
+                '$<select count(*) from nens.Language;>',
+                '$<Program language>'
+                )
+            fi
+    3. LangID = "select ID from nens.Language where Label='$<Program language>'"
+    -----
+nens.Course.id                                   => nens.requiresLanguage:CourseId /* See Course Fields */
+nens.Language.id                                 => nens.requiresLanguage:LanguageId /* See Course Fields */
+    4.
+    EntryExists = select * from requiresLanguage where CourseID='$<ProgramID>' and LanguageID='$<LangID>' ;
+    if ($<EntryExists>) {
+        if ($<LangID>) update nens.requiresLanguage set LanguageID='$<LangID>' where CourseID='$<ProgramID>';
+        }
+    else {
+        insert into nens.requiresLanguage (CourseID,LanguageID,Priority) values ('$<ProgramID>','$<LangID>','1');
+        }
+------------    
+
+
+
+Main-Keywords                                    => nens.MainKeyword:Label /*
+ * ID, Category, Label !SELECTBOX!->hasMainKeyword
+ */
+Keywords                                         => nens.Keyword:Label /*
+ * ID, Category, Label !SELECTBOX!->hasKeyword
+ */
+
+Degree(s) available                              => nens.Degree:Label /*
+ * ID, Category, Label, Description !SELECTBOX!->offersDegree:DegreeID
+ */
+
+
+Host institution 	                         => nens.Institution:Label /*
+  * ID, Label,Department !SELECTBOX!->nens.Contact:InstitutionID
+  */
+  
+Course
+-------------
+ID = ProgramID                                   => nens.Course:ID /* Primary Key */
+nens.Course:OwnerId                              => nens.Course:OwnerId /* Foreign Key to nens.Course*/
+Program Name                                     => nens.Course:Label /* See Course Fields */
+Programme Website                                => nens.Course:Website /* See Course Fields */
+Duration of the program                          => nens.Course:Duration /* See Course Fields */  

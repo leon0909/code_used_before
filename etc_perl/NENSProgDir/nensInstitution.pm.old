@@ -1,0 +1,136 @@
+
+
+package nensInstitution ;
+{
+    use Data::Dumper::Simple ;
+    use Geo::Query::LatLong;
+    use lib qw(/etc/perl/NENSProgDir);
+    use base ('csvParse');
+    use dbActions;
+    # use nensCountry;
+    use strict;
+    no strict 'refs';
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $lastQuery ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Institution' ;
+  $properties{'lastQuery'} = $lastQuery if ($lastQuery);
+  $properties{'cttHash'  } = $cttHash   ;
+  $properties{$properties{'type'}} = 'ID,Label,Department' ;
+  # .............................................
+  # todo the ctInstitution.pm Contact-Person-Institution-Department
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  # .............................................
+  # ....The Host Institution and Contact Person Department
+  # ....are using the same Institution table.............
+  # ....That's why we parse here another field with the same purpose;
+  # ....
+  print "\n IN :".$this->{'type'}.":\n";
+  ILABEL: {
+  ('1') && do {
+      # ....
+      #printf("\n%s\n",$this->{'cttHash'}->{'Host institution'})  ;
+      #printf("\n%s\n",$this->{'cttHash'}->{'Contact-Person-Institution-Department'}) ;
+      # ....
+      # we use the gierige regex here(so no -?- character)
+      ( $this->{'ctDepartment'},
+        $this->{'ctLabel'}
+        ) = $this->{'cttHash'}->{'Contact-Person-Institution-Department'} =~ /^(.*\s?)(\,\s*.*)$/i ;
+      $this->{'ctLabel'} =~ s/^\,\s+//;
+      $this->{'ctLabel'} =~ s/Uni\./University /;
+      $this->{'ctLabel'} =~ s/Univers\./University of /;
+      last ILABEL ;
+      };
+    }
+  # .............................................
+  if ( defined ($this->{'ctLabel'}) && $this->{'ctLabel'} ne '') {
+    # ....................
+    $this->{'Label'} = $this->{'ctLabel'};
+    $this->{'Department'} = $this->{'ctDepartment'} ;
+    # ....................
+    $this->getInstitution();
+    ( $this->{'emptySet'} eq 'no' ) ? $this->updateInstitution() : $this->insertInstitution() ;  
+    }
+  # .............................................
+  ILABEL: {
+  ('1') && do {
+      # printf("\n%s\n%s\n",$this->{'cttHash'}->{'Host institution'},Dumper( $this->{'cttHash'}) ) ;
+      ($this->{'Label'}, $this->{'Department'}) = $this->{'cttHash'}->{'Host institution'} =~ /^(.*?)(\,\s*.*)$/i ;
+      $this->{'Department'} =~ s/^\,\s+//;
+      last ILABEL if ($this->{'Label'} ne '');
+      };
+  ('1') && do {
+      ($this->{'Label'}, $this->{'Department'}) = $this->{'cttHash'}->{'Host institution'} =~ /^(.*?)(\(.*)$/i ;
+      last ILABEL if ($this->{'Label'} ne '');
+      };
+  ('1') && do {
+      ($this->{'Label'}, $this->{'Department'}) = ( 
+        $this->{'cttHash'}->{'Host institution'},
+        ''
+        );
+      last ILABEL ;
+      };
+    }
+  $this->getInstitution();
+  ( $this->{'emptySet'} eq 'no' ) ? $this->updateInstitution() : $this->insertInstitution() ;  
+  # .............................................
+  $this;
+  } # end sub ;
+# ...................
+sub getInstitution {
+  my ($this) = @_;
+  # ...................
+  $this->{'Label'} =~ s/\s+$//;
+  $this->{'lastQuery'}  = 'select '.$this->{'nens.Institution'}.' from Institution where ';
+  $this->{'lastQuery'} .= '`Label` LIKE "%'.$this->{'Label'}.'%";';
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  } # end sub ;
+# ...................
+sub updateInstitution {
+  # ...................
+  my ($this) = @_;
+  my @fields = split( ',', $this->{$this->{'type'}} ) ;
+  $this->{'lastQuery'} = 'update Institution set ';
+  foreach (@fields) {
+    next if ($_ eq 'ID') ;
+    $this->{'lastQuery'} .= $_.'="'.$this->{$_}.'" ';
+    }  
+  $this->{'lastQuery'} .= 'where ID='.$this->{'aSetThatExists'}->{'ID'}.'; ';
+  printf (" %s \n", $this->{'lastQuery'});
+  } # end sub ;
+# ...................
+# printf ("\nkey1: /%s/ , - key2: /%s/ ,\n", $key, $this->{'csv2sqlMap'}->{$key});
+# $this->{'mapSql2Csv'}->{$key}
+# ...................
+sub insertInstitution {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  $fieldstr .= 'insert into Institution ('.$this->{'nens.Institution'  }. ') ';
+  $valstr   .= 'values ("", ';
+  $valstr   .= '"'.$this->{'Label'}.'", ';
+  $valstr   .= '"'.$this->{'Department'}.'" ';
+  # ...................
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+   printf (" %s \n", $this->{'lastQuery'});
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ; 
+  } # end sub ;
+}
+
+1; 
+
+__END__

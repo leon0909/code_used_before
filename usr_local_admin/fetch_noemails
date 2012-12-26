@@ -1,0 +1,25 @@
+#!/bin/bash
+YEAR=2012
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+export PATH
+# ... FUNCITONS .......................................
+# ... FUNCITONS .......................................
+  
+
+
+mysql -u realDBname realDBname --skip-column-names -Be \
+  "SELECT ID,Email FROM Society where Status='valid'" \
+  | while read id ; do
+ # .........................................
+	ID=${id}
+  sid=
+  sid=$(echo ${ID} | awk '{print $1}')
+  smail_admin=
+  smail_admin=$(echo ${ID} | awk '{print $2}')
+  echo ${sid}":"${smail_admin}
+ # .........................................
+ # echo 'SELECT SocietyID,ID,Phone,Fax,FirstName,Name,Status,MemberSince,Institution,Street,ZipCode,City,Country,country_iso
+ # FROM `Member` WHERE email='' and SocietyID='${sid}' ORDER BY SocietyID'
+
+  done
+ # .........................................

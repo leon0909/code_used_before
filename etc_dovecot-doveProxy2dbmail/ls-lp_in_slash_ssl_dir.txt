@@ -1,0 +1,27 @@
+# .............................................
+[root@ns:/etc/dovecot]ls -l ssl/intermediate.pem 
+lrwxrwxrwx 1 root root 44 2012-02-20 16:47 ssl/intermediate.pem -> /etc/ssl/intermediate/RapidSSL_CA_bundle.pem
+[16:02:37][root@ns:/etc/dovecot]ls -lp /etc/ssl/
+total 40
+drwxr-xr-x 2 root root     20480 2012-02-20 14:26 certs/
+drwxr-xr-x 2 root root      4096 2012-02-20 16:40 intermediate/
+-rw-r--r-- 1 root root     10819 2011-10-05 03:20 openssl.cnf
+drwxr-xr-x 2 root ssl-cert  4096 2012-02-20 14:26 private/
+# .............................................
+[16:03:35][root@ns:/etc/dovecot]ls -lp /etc/ssl/private/
+total 16
+-rw------- 1 root dovecot  1708 2012-01-10 12:32 dovecot.pem
+-rw-r----- 1 root ssl-cert 1679 2011-05-07 03:12 ssl-cert-snakeoil.key
+lrwxrwxrwx 1 root root       38 2012-02-20 14:26 ssl-mail.key -> /etc/ssl/private/ssl-cert-snakeoil.key
+-rw-r--r-- 1 root root     1102 2012-02-16 09:27 wildcard_$YOUR_FQDN.csr
+-rw-r--r-- 1 root root     1675 2012-02-16 09:27 wildcard_$YOUR_FQDN.key
+# .............................................
+[16:03:44][root@ns:/etc/dovecot]ls -p /etc/ssl/private/
+dovecot.pem            ssl-mail.key           wildcard_$YOUR_FQDN.key
+ssl-cert-snakeoil.key  wildcard_$YOUR_FQDN.csr
+[16:03:54][root@ns:/etc/dovecot]ls -p /etc/ssl/
+certs/  intermediate/  openssl.cnf  private/
+[16:04:22][root@ns:/etc/dovecot]ls -p /etc/ssl/intermediate/
+RapidSSL_CA_bundle.pem
+# .............................................
+

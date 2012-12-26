@@ -1,0 +1,8 @@
+user = dbmail
+password = bordeaux2010
+hosts = 127.0.0.1
+dbname = dbmail 
+dbtable = dbmail_aliases
+
+query = SELECT DISTINCT 1 FROM dbmail_aliases WHERE SUBSTRING_INDEX(alias, '@', -1) = '%s';
+

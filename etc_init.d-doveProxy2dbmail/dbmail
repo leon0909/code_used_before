@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+# Startup script for the DBMail Imap Server
+#
+# chkconfig: - 81 19
+# description: DBMail is a mail server with a database backend. Unlike \
+#	       WUimapd it does not run through inetd.
+# processname: dbmail-imapd
+# pidfile: /var/run/dbmail-imapd.pid
+# config: /etc/dbmail.conf
+
+### BEGIN INIT INFO
+# Provides:          dbmail
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start dbmail daemon services at boot time
+# Description:       Enable dbmail-imapd dbmail-pop3d dbmail-lmtpd services needed for the dbmail provided by daemon.
+### END INIT INFO
+
+# Source function library.
+
+if [ -f /etc/sysconfig/dbmail ]; then
+        . /etc/sysconfig/dbmail
+fi
+
+# Path to the dbmail script.
+dbmail=/usr/sbin/dbmail-imapd
+export progs="dbmail-lmtpd dbmail-imapd dbmail-pop3d"
+LOCKDIR=/var/lock
+RUNDIR=/var/run/dbmail
+
+RETVAL=0
+
+killproc () {
+  PROGNAME=$1
+  PIDFILE=${RUNDIR}/${PROGNAME}.pid
+  /sbin/start-stop-daemon --oknodo --stop -p $PIDFILE $PROGNAME
+  RETVAL=$?
+  return $RETVAL
+  }
+
+start() {
+          i=$1
+  	  thisPid=$(pgrep $i)
+	  if [ -n "${thisPid}" ]
+	    then
+		echo ${i}" daemon is already running, PID ${thisPid}"
+	    else
+        	echo "Starting $i"
+		## echo " start-stop-daemon --start --quiet --oknodo --pidfile ${RUNDIR}/${i}.pid --exec /usr/sbin/${i} "
+                start-stop-daemon --start --quiet --oknodo --pidfile ${RUNDIR}/${i}.pid --exec /usr/sbin/${i} 
+        	RETVAL=$?
+        	## echo " RETRIVAL IS:/".$RETVAL."/"
+        	[ $RETVAL = 0 ] && touch ${LOCKDIR}/$i.lock
+	  	return $RETVAL
+            fi
+}
+stop() {
+        i=$1
+	echo "Stopping $i: "
+	killproc $i
+	RETVAL=$?
+	echo
+        [ $RETVAL = 0 ] && \
+	  rm -f ${LOCKDIR}/$i.lock ${RUNDIR}/${i}.pid
+}
+reload() {
+        i=$1
+  	thisPid=`pgrep $i`
+	echo "Reloading $i: "
+	/sbin/start-stop-daemon --oknodo -s ${i} -HUP
+	RETVAL=$?
+	echo
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	for i in ${progs}; do
+	  start $i
+          sleep 1
+          done
+	;;
+  stop)
+        allpids=$(ps ax | grep dbmail | grep -v grep | awk '{print $1}' | sort -r)
+	for i in ${progs}; do
+	  stop $i
+          sleep 1
+          done
+        kill -9 $allpids
+	;;
+  status)
+	for i in ${progs}; do
+          status $i
+	  RETVAL=$?
+          done
+	;;
+  restart)
+	stop $progs
+	start $progs
+	;;
+  condrestart)
+	for i in ${progs}; do
+	  if [ -f ${RUNDIR}/${i}.pid ] ; then
+	     stop $i
+	     start $i
+	     fi
+          done
+	;;
+  reload)
+	for i in ${progs}; do
+          reload $i
+          sleep 1
+          done
+	;;
+  *)
+	echo $"Usage: $prog {start|stop|restart|condrestart|reload|status}"
+	exit 1
+esac
+
+exit $RETVAL

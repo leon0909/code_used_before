@@ -1,0 +1,46 @@
+#!/bin/bash
+
+#scriptname /usr/local/admin/check_restart_replication
+# ... the script checks if there is a replication error Last_IO_Error
+# .. that might be because of the secure tunnel connection break.
+# .. it issues the ssh command to restart the broken tunnel
+#...................................
+declare -A REPL_CIRCLE
+REPL_CIRCLE[PORT]=HOST_IP_OR_HOST_NAME
+REPL_CIRCLE[38888]=141.80.XXX.XXX
+REPL_CIRCLE[37777]=w1.$YOUR_FQDN
+REPL_CIRCLE[32222]=w2.$YOUR_FQDN
+#...................................
+SSH_KEY_USER=replika
+RSA_FILE=/home/replika/.ssh/mysql.replication.w1
+USR=root
+AUTH=hungryGIANT
+TMPPF=/tmp/replika_check.pid
+
+#.......................
+CHECK=$( echo "show slave status \G;" | mysql -u${USR} -p${AUTH} | grep Last_IO_Error | awk '-F:' '{print $2":"$3}')
+
+# our replication master is a connection to the localhost on one of these ports:
+# 38888, 37777, 32222
+# so if the tunnel error ocurs we have a line mentioning our socket, thats why 
+# we check for 127 in our regex check:
+#
+if [[ "${CHECK}" = *127* ]] ; then
+  PORT=$(echo ${CHECK} | awk '-F:' '{print $2}' | awk "-F'" '{print $1}')
+  echo "The Replication Socket "${REPL_CIRCLE["${PORT}"]}":"${PORT}" is not accessible"
+  echo "Doing restart of the replication over ssh connection"
+  echo
+  SSH=$(which ssh)
+  # ..............................................
+  nohup ${SSH} -a -i ${RSA_FILE} ${SSH_KEY_USER}@${REPL_CIRCLE[${PORT}]} '/usr/local/admin/replication_tunnel.sh start > /dev/null 2>&1' &
+  # ..............................................
+  SSH_CMD_PID=$!
+  # ..............................................
+  sleep 2
+  echo SSH_CMD_PID:${SSH_CMD_PID}
+  trap 'kill -9 ${SSH_CMD_PID}' 5
+else  
+  echo "Replication is Running"
+  fi
+
+exit  

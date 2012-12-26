@@ -1,0 +1,11 @@
+#!/bin/bash
+# Run as root if your listening port is < 1024!
+IPTABLES=$(which iptables)
+EXTERNAL_IP=$(ifconfig | grep Adresse\: | grep P-z-P | awk '-F:' '{print $2}' | awk '{print $1}')
+
+# $IPTABLES -t nat -A PREROUTING --dst $EXTERNAL_IP -p tcp --dport 20200 -j DNAT --to-destination 192.168.0.23:8080
+echo $IPTABLES -t nat -A PREROUTING --dst $EXTERNAL_IP -p tcp --dport 21 -j DNAT --to-destination $EXTERNAL_IP:2021
+# $IPTABLES -t nat -A POSTROUTING --dst 192.168.0.23 -p tcp --dport 8080 -j SNAT --to-source $EXTERNAL_IP
+echo $IPTABLES -t nat -A POSTROUTING --dst $EXTERNAL_IP -p tcp --dport 2021 -j SNAT --to-source $EXTERNAL_IP
+# $IPTABLES -t nat -A OUTPUT --dst $EXTERNAL_IP -p tcp --dport 20200 -j DNAT --to-destination 192.168.0.23:8080
+echo $IPTABLES -t nat -A OUTPUT --dst $EXTERNAL_IP -p tcp --dport 21 -j DNAT --to-destination $EXTERNAL_IP:2021

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+
+stamp2date (){
+    date --utc --date "1970-01-01 $1 sec" "+%Y-%m-%d %T"
+    }
+OUTDATE=$(stamp2date $1)
+
+echo $OUTDATE
+

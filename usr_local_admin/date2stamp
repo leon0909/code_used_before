@@ -1,0 +1,10 @@
+#!/bin/bash
+
+
+date2stamp (){
+    date --utc --date "$1" "+%s"
+    }
+OUTSTAMP=$(date2stamp $1)
+
+echo $OUTSTAMP
+

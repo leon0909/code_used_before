@@ -1,0 +1,6 @@
+user = mailuser
+password = bordeaux2010
+hosts = 127.0.0.1
+dbname = mailserver
+query = SELECT 1 FROM view_users WHERE email='%s'
+

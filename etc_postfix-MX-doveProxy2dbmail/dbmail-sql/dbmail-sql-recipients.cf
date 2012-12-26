@@ -1,0 +1,7 @@
+user = dbmail
+password = bordeaux2010
+hosts = 127.0.0.1
+dbname = dbmail 
+dbtable = dbmail_aliases
+
+query = SELECT alias FROM dbmail_aliases WHERE alias='%s'

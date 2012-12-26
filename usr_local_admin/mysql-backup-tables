@@ -1,0 +1,54 @@
+#!/bin/bash
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:usr/local/sbin
+export PATH
+dumpdir='/home/backup/mysql/'
+date=$(date +"%Y-%m-%d,%H:%M")
+backup="/home/backup/mysqldump"
+svntree="/home/backup/svn-databases/trunk"
+tarfile="${backup}.tar.gz"
+logfile="${backup}.log"
+errors="${backup}.errors.log"
+databases=$( echo 'show databases;' | mysql -ureadOnly -ponlyRead )
+exec 2>>${errors}
+exec 1>>${logfile}
+echo "### mysqldump from ${date}"
+
+
+cd ${dumpdir} 
+
+for i in ${databases}; do
+  DBDIR=${dumpdir}${i}
+  rm -rf ${DBDIR} && mkdir -p ${DBDIR}
+  cd ${DBDIR}
+  TABLES=$(echo 'show tables;' | mysql -ureadOnly -ponlyRead ${i})
+  TODAY=$(date +"%Y-%m-%d_%H-%M")
+  pwd 
+  for t in ${TABLES}; do
+    # debbug: echo "nice -10 mysqldump --single-transaction -ureadOnly -ponlyRead $i $t > ${DBDIR}"/"${t}"-"${TODAY}.sql"
+    nice -10 mysqldump --single-transaction -ureadOnly -ponlyRead $i $t > ${DBDIR}"/"${t}"-"${TODAY}.sql
+    done
+  done
+
+for i in $(seq 10 -1 1)
+do
+  oldfile="${tarfile}.${i}"
+  newfile="${tarfile}.$(expr ${i} + 1)"
+  if ( test -e "${oldfile}" )
+  then
+    mv "${oldfile}" "${newfile}"
+  fi
+done
+
+# keep 10 version
+if ( test -e "${tarfile}.11" )
+then
+  rm -f "${tarfile}.11"
+fi
+
+mv "${tarfile}" "${tarfile}.1"
+tar -czf "${tarfile}" "$dumpdir" --label "MySQlDump,${date}"								  
+#echo "- doing: cp -a ${tarfile} ${svntree}/ -"
+#cp -a ${tarfile} ${svntree}"/"
+#echo "- doing: cd ${svntree}/ && svn commit -"
+#cd  ${svntree}"/" && svn commit -m "++ database changes on "${date}" ++"
+

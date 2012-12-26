@@ -1,0 +1,1546 @@
+#
+##
+##
+##
+#
+
+package csvParse ;
+{
+  use Data::Dumper::Simple ;
+  use lib qw(/etc/perl/NENSProgDir);
+  use strict;
+  no strict 'refs';
+# ...............................................  
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $CSVPath ) = @_;
+  # ...................
+  my %properties =() ;
+  $properties{'csv-path'} = $CSVPath;
+  $properties{'csv2sqlMap'  } = {
+    '1D'                           => 'Course:ID', #/* Primary Key in Course and Foreign key for the Course in Contact */
+    'Program Name'                 => 'Course:Label', #/* See Course Fields */
+    'Programme Website'            => 'Course:Website', #/* See Course Fields */
+    'Duration of the program'      => 'Course:Duration', #/* See Course Fields */
+    'Program language'             => 'Language:Label', #/* tables requiresLanguage and over its foreign key - Language  */
+    'Degree(s) available'          => 'Degree:Label', #/* Foreign Key */
+    'Phone'                        => 'Contact:Phone', #/* See Contact Fields */
+    'Fax'                          => 'Contact:Fax', #/* See Contact Fields */
+    "Coordinator's e-mail address" => 'Contact:Email', #/* See Contact Fields */
+    'Website'                      => 'Contact:Website', #/* See Contact Fields  */
+    'Contact Person'               => 'Contact:Name', #/* See Contact Fields */
+    'Contact-Person-Street'        => 'Contact:Street', # /* See Contact Fields */
+    'ZIP code'                     => 'Contact:Zipcode', #/* See Contact Fields */
+    'Contact-Person-Country'       => 'Country:Label', #/* Foreign Key to nens.City.CountryID */
+    'Contact-Person City'          => 'City:Label', #/* Foreign Key to nens.City */
+    'Contact-Person-Institution-Department' => 'Institution:Department', #/* See Fields in Institution */
+    'Host Institution'             => 'Institution:Label', # /* its ID is a Foreign Key in Contact  */
+    'Main-Keywords'                => 'Main-Keywords:Label', #/* */
+    'Keywords'                     => 'Keywords:Label' #/* */
+    };
+  # .............................................
+  %{$this} = %properties ;
+  $this->{'mapSql2Csv'}->{$this->{'csv2sqlMap'}->{$_}} = $_ for keys %{$this->{'csv2sqlMap'}};
+  # .............................................
+  $this->readCSV () ;
+  }
+# ...........................
+sub csv2sqlMap {
+  my ( $this ) = @_;
+  $this->{'csv2sqlMap'};
+  }
+# ...........................
+sub mapSql2Csv {
+  my ( $this ) = @_;
+  $this->{'mapSql2Csv'};
+  }
+# ...........................
+sub allRows {
+  my ( $this ) = @_;
+  $this->{'allRows'};
+  }
+# ...........................
+sub readCSV {
+  # .............................
+  my ( $this ) = @_;
+  # ...................
+  open CSV, "<", $this->{'csv-path'} or die $this->{'csv-path'}.": $!";
+  my $count = 0;
+  while (<CSV>) {
+    my ($line,) = $_ =~ /^;(\d+.*)$/;
+    chomp ($line);
+    my @fields = ();
+    my $act=1;
+    @fields = split ';', $line;
+    chomp @fields;
+    if ( $fields[0] =~ /1D/i ) {
+      # ..........................
+      $act=$#fields;
+      for (my $i=0; $i<@fields; $i++) {
+        # ..........................
+        $this->{'fieldNames'}->{$i} = $fields[$i]; 
+        } # foreach
+      } # fi
+    else {
+      # ..........................
+      $act=$#fields;
+      for (my $i=0;$i<@fields;$i++) {
+        # ..........................
+        $this->{'row'.$count}->{$this->{'fieldNames'}->{$i}} = $fields[$i];
+        } # foreach
+      push (@{$this->{'allRows'}},$this->{'row'.$count});   
+      } # else
+    $count ++;  
+    } # while
+  } # readCSV end;
+# ...................
+ # if ( $count eq '1' ) {    
+ #   printf("%s\n",Dumper($this->{'allRows'}));
+ #   exit;
+ #  }
+# ...................
+sub debug {
+  my ($this,$what) = @_ ;
+  unless ($what) {
+    print Dumper($this) ;
+    }
+  else {
+    print Dumper($what) ;
+    }
+  } # debug end;
+# ...................
+}
+
+1;
+
+__END__
+use Data::Dumper::Simple ;
+use DBI;
+use lib qw(/etc/perl/NENSProgDir);
+use strict;
+no strict 'refs';
+
+
+package dbActions ;
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $WhatToDo,$sqlQuery,$DBTable ) = @_;
+  my %properties =() ;
+  ($DBTable) ?  my ($db,$table) = $DBTable =~ /^(.*?)\.(.*)$/
+    : die ("\nNo dbname.table data was given at module initialisation!\n") ;
+  $properties{'toDo'} = $WhatToDo       ;
+  $properties{'dbTable'} = $table       ;
+  $properties{'dbName'}  = $db          ;
+  $properties{'dbPort'} = '3306'        ;
+  $properties{'host'  } = '127.0.0.1'   ;
+  $properties{'dbUser'  } = $db         ;
+  $properties{'sqlQuery'  } = $sqlQuery ;
+  # .............................................
+  %{$this} = %properties ;
+  $this->doWhatsToBeDone();
+  } # end sub ;
+# ...................
+sub doWhatsToBeDone {
+  my ($this) = @_ ;
+  WHATTODO: {
+   ($this->{'toDo'} eq 'check') 
+    && do {
+      $this->{lastQuery} = $this->{'sqlQuery'} ;
+      $this->{'key_field'} = 'ID';
+      $this-> checkIfEntryExists() ;
+      last WHATTODO;
+      };
+   ($this->{'toDo'} eq 'IsttnRows') 
+    && do {
+      $this->{lastQuery} = $this->{'sqlQuery'} ;
+      $this->{'key_field'} = 'InstitutionID';
+      $this-> checkIfEntryExists() ;
+      last WHATTODO;
+      };
+   ($this->{'toDo'} eq 'multiRows') 
+    && do {
+      $this->{lastQuery} = $this->{'sqlQuery'} ;
+      $this->{'key_field'} = 'CourseID';
+      $this->dbQueryExec();
+      last WHATTODO;
+      };
+   ($this->{'toDo'} ne 'check') 
+    && do {
+      $this->{'key_field'}='';
+      $this->{lastQuery} = $this->{'sqlQuery'} ;
+      $this->dbQueryExec();
+      last WHATTODO;
+      };
+    }
+  } # end sub ;
+
+# ...................
+sub checkIfEntryExists {
+  # returns true if entry already exists
+  # ...................
+  my ($this) = @_ ;
+  $this->dbQueryExec();
+
+  printf("query:/%s/\nCCCCresultSet:/%s/\n",
+    $this->{'lastQuery'}, 
+    $this->{'resultSet'}
+    );
+  $this->{'emptySet'} = 'yes' unless ($this->{'resultSet'});
+  $this->{'emptySet'} = 'no'  if ($this->{'resultSet'});
+  } #  end sub;
+
+# ...................
+sub dbQueryExec {
+    # .............................................
+    # needs to have $this->{'lastQuery'} be preset to a SQL Query
+    # exmpl.: "SELECT count(*) FROM `Member` WHERE `Newsletter`='yes' and `Status`='valid'" ;
+    #
+    # set $output to "yes" if something is awaited as such
+
+    my ($this, $output) = @_ ;
+    # ...................................
+    my $dsn  = "DBI:mysql:database=".$this->{'dbName'}.";";
+    $dsn .= "host=".$this->{'dbHost'}.";" ;
+    $dsn .= "port=".$this->{'dbPort'}.";" ;
+    #$dsn .= "user=".$this->{'dbUser'}.";" ;
+    # $dsn .= "password=".$this->{'dbPass'} ;
+    # printf ("dsn:%s\n", $dsn);
+    # printf ("user:%s\n", $this->{'user'});
+    # exit;
+    # .........................
+    my ($dbh,$drh) =('',''); 
+    $dbh->{mysql_enable_utf8} = 1; 
+    $dbh= DBI->connect  ( $dsn, $this->{'dbUser'}, '', {'RaiseError' => 1} ) or die($!);
+    $drh = DBI->install_driver("mysql");
+    $dbh->do('SET NAMES \'utf8\';') || die();
+    # ........................................
+    # if ( $this->{'lastQuery'} =~ /view/) {
+    #  printf("%s",Dumper($this->{'lastQuery'}));
+    #  }
+
+    printf("%s",Dumper($this->{'lastQuery'}));
+    my $sth = $dbh->prepare($this->{'lastQuery'});
+    $sth->execute or die ( 
+        "Cannot execute this query:".$this->{'lastQuery'}."\n"
+        .$this->getSQLError( $sth->errstr, $this->{'lastQuery'}, '1' )
+      );
+    SQLQUERIES: {             
+      # .........................
+        ($output ne 'insert')
+        and ($output ne 'update')
+        and $this->{'key_field'} ne '' 
+        and $this->{'toDo'} eq 'check' 
+        and do { # THIS IS 4-SELECT QUERIES ONLY ..!...
+          # ...........................
+          $this->{'lastDBOutput'} = $sth->fetchall_hashref( $this->{'key_field'} ) ;
+          my $key ='';
+          my %rss=%{ $this->{'lastDBOutput'} } ;
+          foreach $key (keys %rss ) {
+            if ($key ne '') {
+              $this->{'resultSet'} = $key if ($key ne '');
+              last;
+              }
+            }
+  print "\ndbA_ result set:$this->{'resultSet'}\n";
+          last SQLQUERIES ;
+          };
+      # .........................
+        ($output ne 'insert')
+        and ($output ne 'update')
+        and $this->{'key_field'} ne '' 
+        and $this->{'toDo'} eq 'IsttnRows' 
+        and do { # THIS IS 4-SELECT QUERIES ONLY ..!...
+          # ...........................
+          $this->{'lastDBOutput'} = $sth->fetchall_hashref( $this->{'key_field'} ) ;
+          my $key ='';
+          my %rss=%{ $this->{'lastDBOutput'} } ;
+          foreach $key (keys %rss ) {
+            if ($key ne '') {
+              $this->{'resultSet'} = $key if ($key ne '');
+              last;
+              }
+            }
+  print "\ndbA_ result set:$this->{'resultSet'}\n";
+          last SQLQUERIES ;
+          };
+        # .........................
+        ($output ne 'insert')
+        and ($output ne 'update')
+        and $this->{'key_field'} ne '' 
+        and $this->{'toDo'} eq 'multiRows' 
+        and do { # and THIS IS 4-SELECT QUERIES ONLY with multiple result ..!...
+          undef($this->{'resultSet'}) ;
+          my $ref;
+          my $count=0;
+          while ( $ref = $sth->fetchrow_hashref( ) 
+            ) {
+            $this->{'lastDBOutput'}->{$count} = $ref ;
+            push ( @{$this->{'resultSet'}},  $count ); 
+            $count ++ ;
+            }
+  print "\nWWA_ result set:$this->{'resultSet'}";
+          last SQLQUERIES ;
+          };
+          # .........................
+        # .........................
+      # .........................
+      } # end LABEL;
+    # ........................................
+    $sth->finish();
+    $dbh->disconnect();
+    }
+# ...................
+sub debug {
+  my ($this,$what) = @_ ;
+  unless ($what) {
+    print Dumper($this) ;
+    }
+  else {
+    print Dumper($what) ;
+    }
+  } # debug end;
+# ...................
+1;
+__END__
+use Data::Dumper::Simple ;
+use Geo::Query::LatLong;
+use lib qw(/etc/perl/NENSProgDir);
+use dbActions;
+use nensCountry;
+use strict;
+no strict 'refs';
+
+
+package nensCity ;
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $lastQuery ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.City' ;
+  $properties{'apikey'} = "ABQIAAAAPU7fv7U6Ax0WPiJM9KKwZBRCYSnFLLWEMMijz2uF-oJq8HsBthSFD5uSoftEjLWnEt_K81gVUIQcMg" ;
+  $properties{'lastQuery'} = $lastQuery if ($lastQuery);
+  $properties{'cttHash'  } = $cttHash   ;
+  $properties{$properties{'type'}} = 'ID,CountryID,Label,Coords' ;
+  # .............................................
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  # .............................................
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  $this->getCity();
+  # here we just reach the content hash further
+  # to the Institution Object for it to update or to insert the Institution
+  # data.
+  $this->{'country'} = new nensCountry($this->{'cttHash'}, $csvpars);
+  #print Dumper($this->{'country'});
+  #exit;
+  $this->{'aSetThatExists'}->{'CountryID'} = $this->{'country'}->{'aSetThatExists'}->{'ID'} ;
+  $this->{'cttHash'}->{'Contact-Person-Country'} = $this->{'country'}->{'aSetThatExists'}->{'ID'} ;
+  $this->getCityCoordinates(
+    $this->{'aSetThatExists'}->{'Label'},
+    $this->{'country'}->{'aSetThatExists'}->{'ISO'},
+    );
+  ( $this->{'emptySet'} eq 'no' ) ? $this->updateCity() : $this->insertCity() ;  
+  undef ($this->{'lastQuery'}) ;
+  $this;
+  } # end sub ;
+sub getCityCoordinates {
+  my ($this, $city, $countryISO) = @_;
+  my $geo = Geo::Query::LatLong->new( source => 'Google', apikey => $this->{'apikey'} );
+  my $res = $geo->query( city => $city, country_code => $countryISO ); # FIPS 10 country code
+  $this->{'lat'} = $res->{'lat'};
+  $this->{'lng'} = $res->{'lng'};
+  $this->{'Coords'} = $res->{'lat'}.",".$res->{'lng'}.",0";
+  }
+# ...................
+sub getCity {
+  my ($this) = @_;
+  # ...................
+  undef ($this->{'lastQuery'}) ;
+  # ...................
+  $this->{'lastQuery'}  = 'select '.$this->{'nens.City'}.' from City where ';
+  $this->{'lastQuery'} .= '`Label`="'.$this->{'cttHash'}->{'Contact-Person City'}.'";';
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  #print Dumper ($this->{'aSetThatExists'}) ;
+  } # end sub ;
+# ...................
+sub updateCity {
+  # ...................
+  my ($this) = @_;
+  # ...................
+  undef ($this->{'lastQuery'}) ;
+  # ...................
+  if ( $this->{'aSetThatExists'}->{'Coords'} eq 'Null' ) {
+    $this->{'lastQuery'} = 'update City set Coords="'.$this->{'Coords'}.'" where ID='.$this->{'aSetThatExists'}->{'ID'}.'; ';
+    }
+  else {
+    undef $this->{'lastQuery'} ;
+    }
+  } # end sub ;
+#printf (" %s \n", $this->{'lastQuery'});
+# ...................
+# printf ("\nkey1: /%s/ , - key2: /%s/ ,\n", $key, $this->{'csv2sqlMap'}->{$key});
+# $this->{'mapSql2Csv'}->{$key}
+# ...................
+sub insertCity {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  # .........................
+  undef ($this->{'lastQuery'}) ;
+  # .........................
+  $this->{Coords} = '' if ( $this->{Coords} =~ /99\,99\,0/ );
+  $fieldstr .= 'insert into City ('.$this->{'nens.City'  }. ') ';
+  $valstr   .= 'values ("", "'.$this->{'country'}->{'aSetThatExists'}->{'ID' }.'", ';
+  $valstr   .= '"'.$this->{'cttHash'}->{'Contact-Person City'}.'", ';
+  $valstr   .= '"'.$this->{Coords}.'" ';
+  
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  } # end sub ;
+# printf (" %s \n", $this->{'lastQuery'});
+
+1; 
+
+__END__
+#
+##
+##
+#
+
+package nensContact ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use base ('csvParse');
+    use dbActions;
+    use nensCity;
+    use nensTakesPlaceAt; 
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Contact' ;
+  $properties{'cttHash'  } = $cttHash   ;
+  # .............................................
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  # .............................................
+  $this->{'foreignKeys'} = "CourseID,CityID,InstitutionID";
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  $this->getType();
+  # .............................................
+  $this->{'typeFields'}->{'CourseID'}      = 'getsSetTrhoughCallBack';
+  $this->{'typeFields'}->{'CityID'}        = 'getsSetTrhoughCallBack';
+  $this->{'typeFields'}->{'InstitutionID'} = 'getsSetTrhoughCallBack';
+  # .............................................
+  $this->getContact();
+  # .................................
+  $this->{'typeFields'}->{'CourseID'} = $this->{'aSetThatExists'}->{'CourseID'} 
+    if ($this->{'aSetThatExists'}->{'CourseID'});
+  # .................................
+  $this->{'typeFields'}->{'ID'}       = $this->{'aSetThatExists'}->{'ID'} 
+    if ($this->{'aSetThatExists'}->{'ID'});
+  # .................................
+  # we just reach the content hash further 
+  # to another Fieldname Object for it to update or to insert 
+  # the needed Foreign Key data.
+  # .................................
+  # the City Object 
+  my $city = new nensCity($this->{'cttHash'},$csvpars);
+      $this->{'typeFields'}->{'CityID'} = $city->{'aSetThatExists'}->{'ID'} ;
+      $this->{'aSetThatExists'}->{'CityID'} = $city->{'aSetThatExists'}->{'ID'} ;
+      $this->{'cttHash'}->{'Contact-Person City'} = $city->{'aSetThatExists'}->{'ID'} ;
+      $this->{'aSetThatExists'}->{'CountryID'} = $city->{'aSetThatExists'}->{'CountryID'} ;
+      $this->{'cttHash'}->{'Contact-Person-Country'} = $city->{'aSetThatExists'}->{'CountryID'} ;
+  # .................................
+  #  the Institution Object
+  my $institution = new nensTakesPlaceAt($this->{'cttHash'},$csvpars);
+      $this->{'typeFields'}->{'InstitutionID'} 
+        = $institution->{'contactInstitution'}->{'aSetThatExists'}->{'ID'} ;
+      $this->{'cttHash'}->{'InstitutionID'} = $institution->{'aSetThatExists'}->{'ID'} ;
+      $this->{'aSetThatExists'}->{'InstitutionID'} = $institution->{'aSetThatExists'}->{'ID'} ;
+  # .............................................  
+  #print "\n Fields :/".Dumper($this->{'typeFields'})."/:\n";
+  #print "\n Types :/".Dumper($this->{'fieldsTypes'})."/:\n";
+  # .............................................  
+  $this->getContact();
+  $this->{'ContactID'} = $this->{'aSetThatExists'}->{'ID'};
+  # ...................
+  ( $this->{'emptySet'} eq 'no' ) ? $this->updateContact() : $this->insertContact() ;  
+  # ...................
+  sleep 2 ;
+  $this->getContact();
+#  print Dumper ($this);
+  } # end sub ;
+# ...................
+sub getType {
+  my ($this) = @_;
+  ($this->{'db'},$this->{'table'}) = $this->{'type'} =~ /(.*?)\.(.*)/;
+  foreach my $key ( sort (keys %{$this->{'mapSql2Csv'}})) {
+    if ($key =~ /$this->{'table'}/) { 
+      ($this->{'tmp1'},$this->{'tmp2'}) = $key =~ /(.*?)\:(.*)/;
+      $this->{ $this->{'type'} } .= $this->{'tmp2'}.',';
+      $this->{'typeFields'}->{$this->{'tmp2'}} = $this->{'mapSql2Csv'}->{$key};
+      }
+    }
+  $this->{ $this->{'type'} } .= $this->{'foreignKeys'}.',ID' ;  
+  $this->{'fieldsTypes'}->{$this->{'typeFields'}->{$_}} = $_ for keys %{$this->{'typeFields'}};
+  } # end sub ;
+# ...................
+sub getContact {
+  my ($this) = @_;
+  $this->{'lastQuery'}  = 'select * from Contact where ';
+  $this->{'lastQuery'} .= 'CourseID='.$this->{'cttHash'}->{'1D'}.';';
+  print "\n Query :/".Dumper($this->{'lastQuery'})."/:\n";
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  } # end sub ;
+# ...................
+sub updateContact {
+  # ...................
+  my ($this) = @_;
+  # ...................
+  my $out = '' ;
+  # ...................
+  foreach my $key (keys %{$this->{'cttHash'}}) {
+    next unless ($this->{'aSetThatExists'}->{ $this->{'fieldsTypes'}->{$key} }) ;
+    #printf ("\nkey: %s \n feld: %s", $key, $this->{'fieldsTypes'}->{$key} );
+    $out .= $this->{'fieldsTypes'}->{$key}.'="'.$this->{'cttHash'}->{$key}.'", '
+      if ($this->{'aSetThatExists'}->{$this->{'fieldsTypes'}->{$key}} ne $this->{'cttHash'}->{$key});
+    }
+  chop $out;  
+  chop $out;  
+  ( $out ne '' ) 
+    ?  $this->{'lastQuery'} = 'update Contact set '.$out.' where CourseID='.$this->{'cttHash'}->{'1D'}.'; '
+    :  undef $this->{'lastQuery'} ;
+  } # end sub ;
+#  printf (" %s \n", $this->{'lastQuery'});
+# ...................
+# printf ("\nkey1: /%s/ , - key2: /%s/ ,\n", $key, $this->{'csv2sqlMap'}->{$key});
+# $this->{'mapSql2Csv'}->{$key}
+# ...................
+sub insertContact {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  $fieldstr .= 'insert into Contact (ID, CourseID, InstitutionID, CityID, Priority, Label,';
+  $valstr   .= ') values ("", '.$this->{'cttHash'}->{'1D'}.', ';
+  $valstr   .= $this->{'typeFields'}->{'InstitutionID'}.', ';
+  $valstr   .= $this->{'typeFields'}->{'CityID'}.', ';
+  $valstr   .= '1, "Administration Contact", "';
+  
+  foreach my $key (keys %{$this->{'csv2sqlMap'}}) {
+    next if ( $this->{'csv2sqlMap'}->{$key} =~ /nens\./) ;
+    my ($field, $rest) = $this->{'csv2sqlMap'}->{$key} =~ /^Contact:(\w+?)$/;
+    # printf (" field:%s rest: %s \n", $field, $rest);
+    next unless ($field ne '') ;
+    $fieldstr .= $field.', ';
+    $this->{'cttHash'}->{$key} =~ s/\s+$//;
+    $this->{'cttHash'}->{$key} =~ s/^\s+//;
+    $valstr   .= $this->{'cttHash'}->{$key}.'", "';
+    }
+  chop $fieldstr;  
+  chop $fieldstr;  
+  chop $valstr;  
+  chop $valstr;  
+  chop $valstr;  
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  sleep 1;
+  } # end sub ;
+}
+
+1; 
+
+__END__
+use Data::Dumper::Simple ;
+use Geo::Query::LatLong;
+use lib qw(/etc/perl/NENSProgDir);
+use dbActions;
+use strict;
+no strict 'refs';
+
+
+package nensCountry ;
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $lastQuery ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Country' ;
+  $properties{'apikey'} = "ABQIAAAAPU7fv7U6Ax0WPiJM9KKwZBRCYSnFLLWEMMijz2uF-oJq8HsBthSFD5uSoftEjLWnEt_K81gVUIQcMg" ;
+  $properties{'lastQuery'} = $lastQuery if ($lastQuery);
+  $properties{'cttHash'  } = $cttHash   ;
+  $properties{$properties{'type'}} = 'ID,Label,Coords,ISO' ;
+  # .............................................
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  # .............................................
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  $this->getCountry();
+  $this->insertCountry() if ( $this->{'emptySet'} eq 'yes' );  
+  undef ($this->{'lastQuery'});
+  $this;
+  } # end sub ;
+# ...................
+sub getCountry {
+  my ($this) = @_;
+  # ...................
+  undef ($this->{'lastQuery'});
+  # ...................
+  $this->{'lastQuery'}  = 'select '.$this->{'nens.Country'}.' from Country where ';
+  $this->{'lastQuery'} .= '`Label`="'.$this->{'cttHash'}->{'Contact-Person-Country'}.'";';
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  # print Dumper ($this->{'aSetThatExists'}) ;
+  } # end sub ;
+# ...................
+# printf ("\nkey1: /%s/ , - key2: /%s/ ,\n", $key, $this->{'csv2sqlMap'}->{$key});
+# $this->{'mapSql2Csv'}->{$key}
+# ...................
+sub insertCountry {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  # ...................
+  undef ($this->{'lastQuery'});
+  # ...................
+  $fieldstr .= 'insert into Country ('.$this->{'nens.Country'  }. ') ';
+  $valstr   .= 'values ("", ';
+  $valstr   .= '"'.$this->{'cttHash'}->{'Contact-Person-Country'}.'", ';
+  $valstr   .= '"NULL", ';
+  $valstr   .= '"NULL" ';
+  
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  # ...................
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  } # end sub ;
+1; 
+__END__
+#
+##
+##
+#
+
+package nensCourse ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use base ('csvParse');
+    use dbActions;
+    use nensOffersDegree;
+    use nensReqLanguage;
+    use nensTakesPlaceAt;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $OwnerID ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Course' ;
+  $properties{'cttHash'  } = $cttHash   ;
+  # .............................................
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  $this->{'OwnerID'} = $OwnerID ;
+  # ............FOREIGHN KEYS: ..................
+  # OwnerID:
+  #   -> table Course
+  # .............................................
+  ## The following Foreign Keys are programmatically implemented through
+  ## PHP code of the NENS webpage and not through the SQL table Relations.
+  ## Still their field values should be updated accordingly, - as the
+  ## new data that we gat from the Excel/csv file contains eventually new
+  ## data for their fields.
+  # ...........
+  # LanguageID: 
+  #   ->table Language (1:1) and 
+  #   ->table requiresLanguage (1:Multiple)
+  # DegreeID:
+  #   -> table Degree
+  # ...........
+  $this->{'foreignKeys'} = "OwnerID,LanguageID,DegreeID";
+  # .............................................
+  print "\n -- IN :".$this->{'type'}.": --\n";
+  $this->getType();
+  # .............................................
+  $this->{'typeFields'}->{'OwnerID'}      = $this->{'OwnerID'} ;
+  $this->{'typeFields'}->{'LanguageIDs'}  = 'getsSetTrhoughCallBack';
+  $this->{'typeFields'}->{'DegreeIDs'}    = 'getsSetTrhoughCallBack';
+  #...........
+  # 'Duration of the program'      => 'Course:Duration', #/* See Course Fields */
+  # 'Program language'             => 'Language:Label', #/* tables requiresLanguage and over its foreign key - Language  */
+  # 'Degree(s) available'          => 'Degree:Label',
+  # .............................................
+  # first of all we handle the Foreign Keys Data :
+  # .................................
+  # we just reach the content hash further 
+  # to another Fieldname Object for it to update or to insert 
+  # the needed Foreign Key data.
+  # .................................
+  # the OffersDegree Object 
+  $this->{'typeFields'}->{'DegreeIDs'} = 
+  my $degrees = new nensOffersDegree ($this->{'cttHash'}, $csvpars);
+      # ..! -Combined fields are to be implemented inside the nensOffersDegree - Object !.. ;
+      $this->{'typeFields'}->{'DegreeIDs'} = $degrees->{'aSetThatExists'}->{'IDsCombined'} ;
+      $this->{'cttHash'}->{'Degree(s) available'} = $degrees->{'aSetThatExists'}->{'labelsCombined'} ;
+      #  $this->{'aSetThatExists'}->{'DegreesID'} - doesn't need to be set because the
+      #  table Course doesn't have it as an SQL Relation Foreign Key, but it really is one
+      #  because of the programmatical php implementation of its contents through the 
+      # "select box (type multiple)" php/html construct.
+  # .................................
+  #  the RequiresLanguage Object
+  my $langs = new nensReqLanguage ($this->{'cttHash'}, $csvpars);
+      $this->{'typeFields'}->{'LanguageIDs'} = $langs->{'aSetThatExists'}->{'IDsCombined'} ;
+      $this->{'cttHash'}->{'Program language'} = $langs->{'aSetThatExists'}->{'labelsCombined'} ;
+      #  $this->{'aSetThatExists'}->{'LanguageIDs'} - doesn't need to be set because the
+      #  table Course doesn't have it as an SQL Relation Foreign Key, but it really is one
+      #  because of the programmatical php implementation of its contents through the 
+      # "select box (type multiple)" php/html construct.
+  # .................................
+  #  the RequiresLanguage Object
+  my $langs = new nensTakesPlaceAt ($this->{'cttHash'}, $csvpars);
+      # the called object should handle the takesPlaceAt
+      # and the Institution tables.
+  # .................................
+  #  now we get the data for this object:
+  # .............................................  
+  $this->getCourse();
+  # .................................
+  $this->{'typeFields'}->{'OwnerID'} = $this->{'aSetThatExists'}->{'OwnerID'} 
+    if ($this->{'aSetThatExists'}->{'OwnerID'});
+  # .................................
+  # $this->{'typeFields'}->{'ID'}       = $this->{'cttHash'}->{'1D'} 
+  #  if ($this->{'aSetThatExists'}->{'ID'} eq $this->{'cttHash'}->{'1D'});
+  ( $this->{'emptySet'} eq 'no' ) ? $this->updateCourse() : $this->insertCourse() ;  
+  # ...................
+  $this;
+  } # end sub ;
+# ...................
+sub getType {
+  my ($this) = @_;
+  # ...............................
+  ($this->{'db'},$this->{'table'}) = $this->{'type'} =~ /(.*?)\.(.*)/;
+  # ...............................
+  foreach my $key ( sort (keys %{$this->{'mapSql2Csv'}})) {
+    if ($key =~ /$this->{'table'}/) { 
+      ($this->{'tmp1'},$this->{'tmp2'}) = $key =~ /(.*?)\:(.*)/;
+      $this->{ $this->{'type'} } .= $this->{'tmp2'}.',';
+      $this->{'typeFields'}->{$this->{'tmp2'}} = $this->{'mapSql2Csv'}->{$key};
+      }
+    $this->{ $this->{'type'} } .= 'Created, ' ;
+    $this->{'typeFields'}->{'Created'} = '';
+    $this->{ $this->{'type'} } .= 'Modified ' ;
+    $this->{'typeFields'}->{'Modified'} = '';
+    }
+  # ...............................
+  $this->{ $this->{'type'} } .= $this->{'foreignKeys'} ;  
+  $this->{'fieldsTypes'}->{$this->{'typeFields'}->{$_}} = $_ for keys %{$this->{'typeFields'}};
+  } # end sub ;
+# ...................
+sub getCourse {
+  my ($this) = @_;
+  $this->{'lastQuery'}  = 'select * from Course where ';
+  $this->{'lastQuery'} .= 'ID='.$this->{'cttHash'}->{'1D'}.';';
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  #print Dumper ($this->{'aSetThatExists'});
+  } # end sub ;
+# ...................
+sub updateCourse {
+  # ...................
+  my ($this) = @_;
+  # ...................
+  my $out = '' ;
+  # ...................
+  foreach my $key (keys %{$this->{'cttHash'}}) {
+    next unless ($this->{'aSetThatExists'}->{ $this->{'fieldsTypes'}->{$key} }) ;
+    #printf ("\nkey: %s \n feld: %s", $key, $this->{'fieldsTypes'}->{$key} );
+    $out .= $this->{'fieldsTypes'}->{$key}.'="'.$this->{'cttHash'}->{$key}.'", '
+      if ($this->{'aSetThatExists'}->{$this->{'fieldsTypes'}->{$key}} ne $this->{'cttHash'}->{$key});
+    }
+  chop $out;  
+  chop $out;  
+  ( $out ne '' ) 
+    ?  $this->{'lastQuery'} = 'update Course set '.$out.' where ID='.$this->{'cttHash'}->{'1D'}.'; '
+    :  undef $this->{'lastQuery'} ;
+  } # end sub ;
+# printf ("\n %s \n", $this->{'lastQuery'});
+# ...................
+sub insertCourse {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  my $timestemp = time() ;
+  $fieldstr .= 'insert into Course ( ID, OwnerID, Created, Modified, Status, ';
+  $valstr   .= ' ) values ('.$this->{'cttHash'}->{'1D'}.', ';
+  $valstr   .= $this->{'OwnerID'}.', ';
+  $valstr   .= $timestemp.', ';
+  $valstr   .= $timestemp .', ';
+  $valstr   .= '1, "';
+  
+  foreach my $key (keys %{$this->{'csv2sqlMap'}}) {
+    next if ( $this->{'csv2sqlMap'}->{$key} =~ /nens\./) ;
+    my ($field, $rest) = $this->{'csv2sqlMap'}->{$key} =~ /^Course:(\w+?)$/;
+    next unless ($field ne '') ;
+    next if ($field eq 'ID') ;
+    $fieldstr .= $field.', ';
+    $valstr   .= $this->{'cttHash'}->{$key}.'", "';
+    }
+
+  chop $fieldstr;  
+  chop $fieldstr;  
+  chop $valstr;  
+  chop $valstr;  
+  chop $valstr;  
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  } # end sub ;
+}
+#  printf ("\n %s \n", $this->{'lastQuery'});
+
+1; 
+
+__END__
+# ............................ #
+package nensDegree ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use dbActions;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $thisDegree, $csvpars ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Degree' ;
+  $properties{'thisDegree'  } = $thisDegree  ;
+  $properties{$properties{'type'}} = 'ID,Label,Category,Description' ;
+  # .............................................
+  %{$this} = %properties ;
+  # .............................................
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  $this->getDegree();
+  if ( $this->{'emptySet'} eq 'yes' ) {
+    $this->insertDegree() ;
+    sleep 1 ;
+    $this->getDegree();
+    }
+  undef ($this->{'lastQuery'}) if ( $this->{'emptySet'} eq 'no' );  
+  $this;
+  } # end sub ;
+# ...................
+sub getDegree {
+  my ($this) = @_;
+  # ................... The refering here:
+  # ..$this->{'cttHash'}->{'thisDegree'} <- should be preset through
+  # ..the calling nensOffersDegree object that devides the degree string
+  # ..and reaches each degree through to this module to be handled 
+  # ..separately.
+  $this->{'lastQuery'}  = 'select '.$this->{'nens.Degree'}.' from Degree where ';
+  $this->{'lastQuery'} .= '`Label`="'.$this->{'thisDegree'}.'";';
+  # ...................
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  # print Dumper ($this->{'aSetThatExists'}) ;
+  } # end sub ;
+# ...................
+sub insertDegree {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  # ................... The refering here:
+  # ..$this->{'cttHash'}->{'thisDegree'} <- should be preset through
+  # ..the calling nensOffersDegree object that devides the degree string
+  # ..and reaches each degree through to this module to be handled
+  # ..separately.
+  $fieldstr .= 'insert into Degree ('.$this->{'nens.Degree'  }. ') ';
+  $valstr   .= 'values ("", ';
+  $valstr   .= '"'.$this->{'thisDegree'}.'", ';
+  $valstr   .= 'NULL, ';
+  $valstr   .= '"NULL" ';
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  # ...................
+  } # end sub ;
+}
+# printf ("\n %s \n", $this->{'lastQuery'});
+
+1; 
+
+__END__
+# ............................ #
+package nensInstitution ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use dbActions;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $thisInstHashRef, $csvpars ) = @_;
+  my %instHashRef = %{$thisInstHashRef} ;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Institution' ;
+  $properties{'thisInstitution' } = $instHashRef{'Institution'} ;
+  $properties{'thisDepartment'  } = $instHashRef{'Department' } ;
+  $properties{$properties{'type'}} = 'ID,Label,Department' ;
+  # .............................................
+  %{$this} = %properties ;
+  # .............................................
+  print "\n -- IN :".$this->{'type'}.": -- \n";
+  $this->getInstitution();
+  if ( $this->{'emptySet'} eq 'yes' ) {
+    $this->insertInstitution() ;
+    sleep 1 ;
+    $this->getInstitution();
+    }
+  undef ($this->{'lastQuery'}) if ( $this->{'emptySet'} eq 'no' );  
+  $this;
+  } # end sub ;
+# ...................
+sub getInstitution {
+  my ($this) = @_;
+  # ................... The refering here:
+  # ..the calling nensTakesPlaceAt object that devides the institution string
+  # ..and reaches each institution through to this module to be handled 
+  # ..separately.
+  $this->{'lastQuery'}  = 'select '.$this->{'nens.Institution'}.' from Institution where ';
+  my ($first, $Department ) = $this->{'thisInstitution'} =~  /^(.*?)([\,|\(.]\s*.*)$/i ;
+  $first =~ s/\s+$//;
+  $Department =~ s/\s+$//;
+  if ($first eq '' or $first =~ /Dep/) {
+    $first = $this->{'thisInstitution'};
+    $first =~ s/\s+$//;
+    $Department = '';
+    $this->{'lastQuery'} .= '`Label`="'.$first.'";';
+    }
+  
+  else {  
+    # ...................
+    $this->{'lastQuery'} .= '`Label` LIKE "%'.$first.'%";';
+    if ($Department ne '' ) {
+      chop($this->{'lastQuery'});
+      $this->{'lastQuery'} .= ' and Department LIKE "%'.$Department.'%";';
+      }
+    }
+  # ...................
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  # print Dumper ($this->{'aSetThatExists'}) ;
+  } # end sub ;
+# ...................
+sub insertInstitution {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  # ................... The refering here:
+  # ..the calling nensTakesPlaceAt object that devides the institution string
+  # ..and reaches each institution through to this module to be handled
+  # ..separately.
+  $fieldstr .= 'insert into Institution ('.$this->{'nens.Institution'  }. ') ';
+  $valstr   .= 'values ("", ';
+  $valstr   .= '"'.$this->{'thisInstitution'}.'", ';
+  $valstr   .= '"'.$this->{'thisDepartment'}.'" ';
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  # ...................
+  } # end sub ;
+}
+
+1; 
+
+__END__
+
+package nensLanguage ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use dbActions;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $thisLanguage, $csvpars ) = @_;
+  my %properties =() ;
+  $properties{'type'} = 'nens.Language' ;
+  $properties{'thisLanguage'  } = $thisLanguage  ;
+  $properties{$properties{'type'}} = 'ID,Label' ;
+  # .............................................
+  %{$this} = %properties ;
+  # .............................................
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  $this->getLanguage();
+  if ( $this->{'emptySet'} eq 'yes' ) {
+    $this->insertLanguage() ;
+    sleep 1 ;
+    $this->getLanguage();
+    }
+  undef ($this->{'lastQuery'}) if ( $this->{'emptySet'} eq 'no' );  
+  $this;
+  } # end sub ;
+# ...................
+sub getLanguage {
+  my ($this) = @_;
+  # ................... The refering here:
+  # ..$this->{'cttHash'}->{'thisLanguage'} <- should be preset through
+  # ..the calling nensReqLanguage object that devides the language string
+  # ..and reaches each language through to this module to be handled 
+  # ..separately.
+  $this->{'lastQuery'}  = 'select '.$this->{'nens.Language'}.' from Language where ';
+  $this->{'lastQuery'} .= '`Label`="'.$this->{'thisLanguage'}.'";';
+  # ...................
+  my $myDB = new dbActions ('check',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}};
+  $this->{'emptySet'}=$myDB->{'emptySet'};
+  # print Dumper ($this->{'aSetThatExists'}) ;
+  } # end sub ;
+# ...................
+sub insertLanguage {
+  my ($this) = @_;
+  my ($fieldstr,$valstr) = ('','');
+  # ................... The refering here:
+  # ..$this->{'cttHash'}->{'thisLanguage'} <- should be preset through
+  # ..the calling nensReqLanguage object that devides the language string
+  # ..and reaches each language through to this module to be handled
+  # ..separately.
+  $fieldstr .= 'insert into Language ('.$this->{'nens.Language'  }. ') ';
+  $valstr   .= 'values ("", ';
+  $valstr   .= '"'.$this->{'thisLanguage'}.'" ';
+  $this->{'lastQuery'} = $fieldstr.$valstr.');'  ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  # ...................
+  } # end sub ;
+}
+# printf ("\n %s \n", $this->{'lastQuery'});
+
+1; 
+
+__END__
+#
+##
+##
+##
+#
+package nensOffersDegree ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use dbActions;
+    use nensDegree;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $lastQuery ) = @_;
+  my %properties =() ;
+  # .............................
+  $properties{'type'} = 'nens.offersDegree' ;
+  # .............................
+  ( # ...................
+    $properties{'typeDB'}, 
+    $properties{'typeTable'} 
+    # ...................
+    ) = $properties{'type'} =~ /^(.*?)\.(.*)/;
+  $properties{'lastQuery'} = $lastQuery if ($lastQuery);
+  $properties{'cttHash'  } = $cttHash   ;
+  $properties{$properties{'type'}} = 'CourseID,DegreeID,Priority' ;
+  # 
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  #$this->{'typeFields'} = 
+  # .............................................
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  # in this object we handle the udate/insert procedures 
+  # inside the getOffersDegree function
+  $this->getOffersDegree($csvpars);
+  # here we just reach the content hash further
+  # to the Institution Object for it to update or to insert the Institution
+  # data.
+  $this;
+  } # end sub ;
+# ...................
+sub getOffersDegree {
+  my ($this, $csvpars) = @_;
+  # ...................
+  # 1. parse $this->{'cttHash'}->{'Program language'} value
+  # and extract each Degree picing them out from a 
+  # comma separated string
+  #
+  my @degrees = split (',',$this->{'cttHash'}->{'Degree(s) available'}) ;
+  # ...................
+  # 2. call the nensDegree object to get sure that every Degree is
+  # already present in the nens.Degrees table
+  #
+  foreach (@degrees) {
+    $this->{'last'} = $_ ; 
+    $this->{'last'} =~ s/^\s+//;
+    $this->{'last'} =~ s/\s+$//;
+    $this->{$this->{'last'}} = new nensDegree($this->{last},$csvpars);
+    $this->{'aSetThatExists'}->{'IDsCombined'}    .= $this->{$this->{'last'}}->{'aSetThatExists'}->{'ID'}.',' ;
+    $this->{'aSetThatExists'}->{'labelsCombined'} .= $this->{$this->{'last'}}->{'aSetThatExists'}->{'Label'}.',' ;
+    $this->{availableDegrees}->{ $this->{'last'} } = $this->{$this->{'last'}}->{'aSetThatExists'}->{'ID'};
+    }
+  # ...................
+  # removing the last semicolon from the combined string:  
+  $this->{'aSetThatExists'}->{'IDsCombined'} =~ s/\,$//;
+  $this->{'aSetThatExists'}->{'labelsCombined'}  =~ s/\,$//;
+  # ...................
+  # 3. Now we are sure to have every new Degree in the Degree Database Table
+  # We could try to update the offersDegree table now, but it is much quicker
+  # just to delete old values and incert the new ones
+  #
+  $this->{'lastQuery'}  = 'delete from  '.$this->{'typeTable'}.' where `CourseID`="'.$this->{'cttHash'}->{'1D'}.'" ;';
+  my $myDB = new dbActions ('delete',$this->{'lastQuery'},$this->{'type'}) ;
+  undef $this->{'lastQuery'} ;
+  # ............................
+  $this->insertOffersDegree();
+  } # end sub ;
+# printf ( "\n %s\n", $this->{'lastQuery'});
+# ...................
+sub makeValstr {
+  my ($this, $langID, $pri) = @_;
+  my $valstr    = 'values ("'.$this->{'cttHash'}->{'1D'}.'", "';
+  $valstr   .=  $langID.'", '.$pri.' );';
+  } # end sub ;
+# ...................
+sub insertOffersDegree {
+  my ($this) = @_;
+  my %degrs = %{$this->{'availableDegrees'}};
+  my $pri = 0;
+  foreach my $key (keys %degrs) {
+    # ..........................
+    undef $this->{'lastQuery'};
+    my $fieldstr  = 'insert into '.$this->{'typeTable'}.' ('.$this->{'nens.offersDegree'  }. ') ';
+    my $valstr    = $this->makeValstr($degrs{$key},$pri);
+    undef $this->{'lastQuery'};
+    $this->{'lastQuery'} = $fieldstr.$valstr ;
+    my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+    $pri ++;
+    }
+  undef $pri;
+  undef $this->{'lastQuery'};
+  } # end sub ;
+}
+# printf ("\n %s \n", $this->{'lastQuery'});
+
+1; 
+
+__END__
+#
+##
+##
+##
+#
+package nensReqLanguage ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use dbActions;
+    use nensLanguage;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $lastQuery ) = @_;
+  my %properties =() ;
+  # .............................
+  $properties{'type'} = 'nens.requiresLanguage' ;
+  # .............................
+  ( # ...................
+    $properties{'typeDB'}, 
+    $properties{'typeTable'} 
+    # ...................
+    ) = $properties{'type'} =~ /^(.*?)\.(.*)/;
+  $properties{'lastQuery'} = $lastQuery if ($lastQuery);
+  $properties{'cttHash'  } = $cttHash   ;
+  $properties{$properties{'type'}} = 'CourseID,LanguageID,Priority' ;
+  # .............................................
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  #$this->{'typeFields'} = 
+  # .............................................
+  print "\n-- IN :".$this->{'type'}.": --\n";
+  # in this object we handle the udate/insert procedures 
+  # inside the getReqLanguage function
+  $this->getReqLanguage($csvpars);
+  # here we just reach the content hash further
+  # to the Institution Object for it to update or to insert the Institution
+  # data.
+  $this;
+  } # end sub ;
+# ...................
+sub getReqLanguage {
+  my ($this, $csvpars) = @_;
+  # ...................
+  # 1. parse $this->{'cttHash'}->{'Program language'} value
+  # and extract each Language picing them out from a 
+  # comma separated string
+  #
+  my @langs = split (',',$this->{'cttHash'}->{'Program language'}) ;
+  # ...................
+  # 2. call the nensLanguage object to get sure that every Language is
+  # already present in the nens.Languages table
+  #
+  foreach (@langs) {
+    $this->{'last'} = $_ ; 
+    $this->{'last'} =~ s/^\s+//;
+    $this->{'last'} =~ s/\s+$//;
+    $this->{$this->{'last'}} = new nensLanguage($this->{last},$csvpars);
+    $this->{'aSetThatExists'}->{'IDsCombined'}    .= $this->{$this->{'last'}}->{'aSetThatExists'}->{'ID'}.',' ;
+    $this->{'aSetThatExists'}->{'labelsCombined'} .= $this->{$this->{'last'}}->{'aSetThatExists'}->{'Label'}.',' ;
+    $this->{languages}->{ $this->{'last'} } = $this->{$this->{'last'}}->{'aSetThatExists'}->{'ID'};
+    }
+  # ...................
+  # removing the last semicolon from the combined string:  
+  $this->{'aSetThatExists'}->{'IDsCombined'} =~ s/\,$//;
+  $this->{'aSetThatExists'}->{'labelsCombined'}  =~ s/\,$//;
+  # ...................
+  # 3. Now we are sure to have every new Language in the Language Database Table
+  # We could try to update the reqiuresLanguage table now, but much quicker
+  # 
+  #  print Dumper ($this);
+  
+  $this->{'lastQuery'}  = 'delete from  '.$this->{'typeTable'}.' where `CourseID`="'.$this->{'cttHash'}->{'1D'}.'" ;';
+  my $myDB = new dbActions ('delete',$this->{'lastQuery'},$this->{'type'}) ;
+  undef $this->{'lastQuery'} ;
+  # ............................
+  $this->insertReqLanguage();
+  } # end sub ;
+# printf ( "\n %s\n", $this->{'lastQuery'});
+# ...................
+sub makeValstr {
+  my ($this, $langID, $pri) = @_;
+  my $valstr    = 'values ("'.$this->{'cttHash'}->{'1D'}.'", "';
+  $valstr   .=  $langID.'", '.$pri.' );';
+  } # end sub ;
+# ...................
+sub insertReqLanguage {
+  my ($this) = @_;
+  my %langs = %{$this->{'languages'}};
+  my $pri = 0;
+  foreach my $key (keys %langs) {
+    undef $this->{'lastQuery'} ;
+    my $fieldstr  = 'insert into '.$this->{'typeTable'}.' ('.$this->{'nens.requiresLanguage'  }. ') ';
+    my $valstr    = $this->makeValstr($langs{$key},$pri);
+    $this->{'lastQuery'} = $fieldstr.$valstr ;
+    my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+    $pri ++;
+    }
+  undef $this->{'lastQuery'};
+  undef $pri;
+  } # end sub ;
+# printf ("\n %s \n", $this->{'lastQuery'});
+}
+
+1; 
+
+__END__
+#
+##
+##
+##
+#
+package nensTakesPlaceAt ;
+{
+    use Data::Dumper::Simple ;
+    use lib qw(/etc/perl/NENSProgDir);
+    use dbActions;
+    use nensInstitution;
+    use strict;
+    no strict 'refs';
+
+sub new {
+  # .............................................
+  my $selfName = shift;
+  my $this     =    {};
+  # .. Referenz auf anonymen hash ;
+  bless($this, $selfName);
+  $this->_init(@_);
+  return $this;
+  } # end sub ;
+# ...................
+sub _init {
+  # .............................
+  my ( $this, $cttHash, $csvpars, $lastQuery ) = @_;
+  my %properties =() ;
+  # .............................
+  $properties{'type'} = 'nens.takesPlaceAt' ;
+  # .............................
+  ( # ...................
+    $properties{'typeDB'}, 
+    $properties{'typeTable'} 
+    # ...................
+    ) = $properties{'type'} =~ /^(.*?)\.(.*)/;
+  $properties{'lastQuery'} = $lastQuery if ($lastQuery);
+  $properties{'cttHash'  } = $cttHash   ;
+  $properties{$properties{'type'}} = 'CourseID,InstitutionID,Type,Description' ;
+  # 
+  %{$this} = %properties ;
+  $this->{'csv2sqlMap'  } = $csvpars->csv2sqlMap();
+  $this->{'mapSql2Csv'} = $csvpars->mapSql2Csv();
+  #$this->{'typeFields'} = 
+  # .............................................
+  print "\n -- IN :".$this->{'type'}.": -- \n";
+  # in this object we handle the udate/insert procedures 
+  # inside the getTakesPlaceAt function
+  $this->getTakesPlaceAt($csvpars);
+  $this;
+  } # end sub ;
+# ...................
+sub getTakesPlaceAt {
+  my ($this, $csvpars) = @_;
+  # .............................................
+  # ....The Host Institution and Contact Person Department
+  # ....are using the same Institution table.............
+  # ....That's why we parse here another field with the same purpose;
+  # ....
+
+  # ...................
+  # 1. parse $this->{'cttHash'}->{'Host institution'} value
+  # and parse $this->{'cttHash'}->{'Contact-Person-Institution-Department'} value
+  # and extract each Institution and each Department picking them out from a 
+  # comma separated string
+  #
+  # ...................
+  # 2. call the nensInstitution object to get sure that every Institution is
+  # already present in the nens.Institution table
+  #
+  # ....
+  # we use the gierige regex here(so no -?- character)
+  ( $this->{'ctDepartment'},
+    $this->{'ctLabel'}
+    ) = $this->{'cttHash'}->{'Contact-Person-Institution-Department'} =~ /^(.*\s?)(\,\s*.*)$/i ;
+  $this->{'ctLabel'} =~ s/^\,\s+//;
+  $this->{'ctLabel'} =~ s/Uni\./University /;
+  $this->{'ctLabel'} =~ s/Univers\./University of /;
+ # .............................................
+  if ( defined ($this->{'ctLabel'}) && $this->{'ctLabel'} ne '') {
+    # ....................
+    $this->{'contact'}->{'Institution'} = $this->{'ctLabel'};
+    $this->{'contact'}->{'Department'} = $this->{'ctDepartment'} ;
+    }
+  # .............................................
+  ILABEL: {
+  ('1') && do {
+      # printf("\n%s\n%s\n",$this->{'cttHash'}->{'Host institution'},Dumper( $this->{'cttHash'}) ) ;
+      ($this->{'Label'}, $this->{'Department'}) = $this->{'cttHash'}->{'Host institution'} =~ /^(.*?)(\,\s*.*)$/i ;
+      $this->{'Department'} =~ s/^\,\s+//;
+      $this->{'ihost'}->{'Institution'} = $this->{'Label'};
+      $this->{'ihost'}->{'Department'} = $this->{'Department'} ;
+      last ILABEL if ($this->{'Label'} ne '');
+      };
+  ('1') && do {
+      ($this->{'Label'}, $this->{'Department'}) = $this->{'cttHash'}->{'Host institution'} =~ /^(.*?)(\(.*)$/i ;
+      $this->{'ihost'}->{'Institution'} = $this->{'Label'};
+      $this->{'ihost'}->{'Department'} = $this->{'Department'} ;
+      last ILABEL if ($this->{'Label'} ne '');
+      };
+  ('1') && do {
+      ($this->{'Label'}, $this->{'Department'}) = ( 
+        $this->{'cttHash'}->{'Host institution'},
+        ''
+        );
+      $this->{'ihost'}->{'Institution'} = $this->{'Label'};
+      $this->{'ihost'}->{'Department'} = $this->{'Department'} ;
+      last ILABEL ;
+      };
+    } # /ILABEL 
+  # ..............................................
+  $this->{'contactInstitution'} = new nensInstitution($this->{'contact'},$csvpars);
+  # ...................
+  $this->{'hostInstitution'} = new nensInstitution($this->{'ihost'},$csvpars);
+  # print Dumper ($this);
+  # ............................
+  my @places = ('hostInstitution') ;
+  foreach (@places) {
+    $this->singleGet($_);
+    $this->deleteTakesPlaceAt($_); 
+    $this->insertTakesPlaceAt($_); 
+    }
+  } # end sub ;
+# ...................
+sub singleGet {
+  my ($this, $InsttnKind) = @_;
+  # ...................
+  undef $this->{'lastQuery'} ;
+  $this->{'lastQuery'}  = 'select '.$this->{$this->{'type'}}.' from '.$this->{'typeTable'}.' WHERE ';
+  $this->{'lastQuery'} .= 'CourseID='.$this->{'cttHash'}->{'1D'}.' AND ';
+  $this->{'lastQuery'} .= 'InstitutionID='.$this->{$InsttnKind}->{'aSetThatExists'}->{'ID'}.' AND ';
+  # .............
+  $this->{'lastQuery'} .= 'Type=1 ;' if ($InsttnKind =~ /^(host??)/)      ;
+  $this->{'lastQuery'} .= 'Type=2 ;' if ($InsttnKind =~ /^(contact??)/) ;
+  # .............
+  my $myDB = new dbActions ('IsttnRows',$this->{'lastQuery'},$this->{'type'}) ;
+  $this->{'aSetThatExists'}=$myDB->{'lastDBOutput'}->{$myDB->{'resultSet'}}  ;
+  # print Dumper($this->{'aSetThatExists'});
+  $this->{'emptySet'}='no'  if ($myDB->{'resultSet'} ne '');
+  $this->{'emptySet'}='yes' if ($myDB->{'resultSet'} eq '');
+  } # end sub ;
+# ...................
+sub deleteTakesPlaceAt {
+  my ($this, $InsttnKind) = @_;
+  # ...................
+  undef $this->{'lastQuery'} ;
+  # ...................
+  $this->{'lastQuery'}  = 'delete from '.$this->{'typeTable'}.' WHERE ';
+  $this->{'lastQuery'} .= 'CourseID='.$this->{'cttHash'}->{'1D'}.' AND ';
+  $this->{'lastQuery'} .= 'InstitutionID='.$this->{$InsttnKind}->{'aSetThatExists'}->{'ID'}.' AND ';
+  # .............
+  $this->{'lastQuery'} .= 'Type=1 ;'  ;
+  my $myDB = new dbActions ('delete',$this->{'lastQuery'},$this->{'type'}) ;
+  # ...................
+  undef $this->{'lastQuery'} ;
+  # ...................
+  }
+# ...................
+sub insertTakesPlaceAt {
+  my ($this, $InsttnKind) = @_;
+  # ...................
+  undef $this->{'lastQuery'};
+  # ...................
+  my $fieldstr  = 'insert into '.$this->{'typeTable'}.' ('.$this->{$this->{'type'}}. ') ';
+  my $valstr    = 'values ("'.$this->{'cttHash'}->{'1D'}.'", "';
+  $valstr .= $this->{$InsttnKind}->{'aSetThatExists'}->{'ID'}.'", ';
+  $valstr .= '1, '   if ($InsttnKind =~ /^(host??)/)     ;
+  $valstr .= '2, '  if ($InsttnKind =~ /^(contact??)/) ;
+  $valstr .= 'NULL ) ;';
+  # ...................
+  $this->{'lastQuery'} = $fieldstr.$valstr ;
+  my $myDB = new dbActions ('insert',$this->{'lastQuery'},$this->{'type'}) ;
+  # ...................
+  undef $this->{'lastQuery'};
+  } # end sub ;
+}
+# printf ("\n %s \n", $this->{'lastQuery'});
+
+1; 
+
+__END__

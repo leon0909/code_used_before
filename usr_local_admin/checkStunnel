@@ -1,0 +1,14 @@
+#!/bin/bash
+
+CHECK=$(/usr/bin/tail -12  /var/log/mail.log | grep "while receiving the initial server greeting");
+
+# .. Should our check not be empty- then we need to reset our stunnel ssl connection
+if [ -n "${CHECK}" ]; then
+  /etc/init.d/stunnel4 stop
+  sleep 1
+  /etc/init.d/stunnel4 start
+  sleep 1
+  # .. and try to resend our derefered mails 
+  /usr/sbin/postqueue -f
+  fi
+

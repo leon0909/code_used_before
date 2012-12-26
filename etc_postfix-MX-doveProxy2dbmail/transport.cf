@@ -1,0 +1,7 @@
+$YOUR_FQDN	 dbmail-lmtp:[127.0.0.1]:24
+mail.$YOUR_FQDN	 dbmail-lmtp:[127.0.0.1]:24
+smtp.$YOUR_FQDN	 dbmail-lmtp:[127.0.0.1]:24
+pop.$YOUR_FQDN	 dbmail-lmtp:[127.0.0.1]:24
+pop3.$YOUR_FQDN	 dbmail-lmtp:[127.0.0.1]:24
+imap.$YOUR_FQDN	 dbmail-lmtp:[127.0.0.1]:24
+

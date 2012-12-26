@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# this script deletes messages that are created due to the service monitoring 
+#
+# A computer of Internet Service Provider makes a contact to Postfix service
+# to check if it is still running and then tears its connection down without 
+# the usual end routine of the smtp protocol.
+# Our postfix service makes a notification about this action and sends it to postmaster
+# every 20 minutes. It is rather lasting to delete more then a hundered of notion mails
+# from the postmaster account every day manually. That's why I use this cron script. 
+
+POSTMASTER1=leonid.heidt
+POSTMASTER2=clemens.webert
+OUT=/tmp/snip
+export OUT POSTMASTER1 POSTMASTER2
+# empty file here
+#
+> /tmp/snip
+
+# fill it up with the output of this pipe:
+#
+grep -Rn "Out: 501 Syntax: EHLO hostname" /home/vmail/$YOUR_FQDN/$POSTMASTER1/mails/cur/ | awk '-F:' '{print $1":"$2}' > /tmp/snip
+grep -Rn "Out: 501 Syntax: EHLO hostname" /home/vmail/$YOUR_FQDN/$POSTMASTER2/mails/cur/ | awk '-F:' '{print $1":"$2}' >> /tmp/snip
+
+LIST=$(cat ${OUT})
+for checkmail in ${LIST}; do
+  rm -f ${checkmail}
+  done
+
+# empty file here
+#
+> /tmp/snip
+
+#end script
+#exit 

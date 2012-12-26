@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# this script sends 3 ping icmp packages to the member computers of the replication circle
+# and looks if there were any of "100% packet loss" answers ;
+
+# if there is one a message is send to the system administrator to notify him of the possible
+# replication fail out and an IP-Address of the failed out node.
+
+# .............................................../
+CIRCLE_MEMBERS='62.241.61.17 141.80.163.160 141.80.13.42'
+WEBMASTERS='leonid.heidt@gmx.net leonid.heidt@$YOUR_FQDN clemens.webert@mdc-berlin.de clemens.webert@$YOUR_FQDN'
+MESSAGE_TIME=$(date)
+ME=$(ifconfig | grep "inet addr" | grep -v 127.0 | awk '-F:' '{print $2}' | awk '{print $1}')
+[[ ${ME} = '' ]] && ME=$(ifconfig | grep "inet Adr" | grep -v 127.0 | awk '-F:' '{print $2}' | awk '{print $1}')
+# echo ME:$ME
+export ME MESSAGE_TIME=$(date)
+# .............................................../
+function sendMessage() {
+  # ............................................./
+  MESSAGE=$(echo "Today on "${MESSAGE_TIME}" a MEMBER of the MySQL REPLICATION CIRCLE")
+  MESSAGE=${MESSAGE}$(echo " with this IP-ADDRESS: "${1})
+  MESSAGE=${MESSAGE}$(echo " was not accessible for the ICMP-Ping please recheck the SLAVE MASTER")
+  MESSAGE=${MESSAGE}$(echo " REPLICATION State of the CIRCLE")
+  MESSAGE=${MESSAGE}$(echo " The Check SCRIPT was executed on "${ME})
+  # ............................................./
+  for i in ${WEBMASTERS} ; do
+    echo ${MESSAGE} | mail -s "Replication Fail Out" ${i}
+    done
+  }
+# .............................................../
+for i in ${CIRCLE_MEMBERS}; do
+  # debug: echo ${i}
+  CHECK=$(ping -c3 ${i} | grep "100% packet loss")
+  if [ -n "${CHECK}" ] ; then
+    export i
+    sendMessage ${i} 
+    fi
+  done
+exit

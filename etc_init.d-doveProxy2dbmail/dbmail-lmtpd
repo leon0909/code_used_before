@@ -1,0 +1,106 @@
+#!/bin/bash
+#
+# Startup script for the DBMail Lmtp Server
+#
+# chkconfig: - 81 19
+# description: DBMail is a mail server with a database backend. Unlike \
+#	       WUimapd it does not run through inetd.
+# processname: dbmail-lmtpd
+# pidfile: ${RUNDIR}/dbmail-lmtpd.pid
+# config: /etc/dbmail.conf
+
+# Source function library.
+# READ_HAT only: . /etc/rc.d/init.d/functions
+
+if [ -f /etc/sysconfig/dbmail ]; then
+        . /etc/sysconfig/dbmail
+fi
+
+# Path to the dbmail script.
+dbmail=/usr/sbin/dbmail-lmtpd
+prog=dbmail-lmtpd
+LOCKDIR=/var/lock
+RUNDIR=/var/run/dbmail
+RETVAL=0
+
+killproc () {
+  PROGNAME=$1
+  PIDFILE=${RUNDIR}/${PROGNAME}.pid
+  LOCKFILE=${LOCKDIR}/${PROGNAME}.lock
+  echo "/sbin/start-stop-daemon --oknodo --stop -p >"$PIDFILE"<  >"$PROGNAME"<"
+  /sbin/start-stop-daemon --oknodo --stop -p $PIDFILE $PROGNAME
+  RETVAL=$?
+  [ $RETVAL = 0 ] && \
+    ## echo "ALLPIDS CMD:ps ax | grep ${PROGNAME} | grep -v grep | awk '{print \$1}' | sort -r" && \
+    allpids=$(ps ax | grep ${PROGNAME} | grep -v grep | awk '{print $1}') && \
+    echo "Killing it just the same" && kill -9 ${allpids} 
+  RETVAL=$?
+  return $RETVAL
+  }
+
+start() {
+	pid=`pidof $prog`
+  	PIDFILE=${RUNDIR}/$prog.pid
+  	LOCKFILE=${LOCKDIR}/$prog.lock
+	if [ -n "$pid" ]
+	then
+		echo "dbmail pop daemon is already running, PID $pid"
+	else
+        	echo -n $"Starting $prog: "
+                start-stop-daemon --start --quiet --oknodo --pidfile ${PIDFILE}.pid --exec $dbmail 
+        	RETVAL=$?
+        	echo
+        	[ $RETVAL = 0 ] && touch ${LOCKFILE} && chown nobody:nogroup ${LOCKFILE}
+        	return $RETVAL
+	fi
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc $prog
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f ${LOCKDIR}/$prog.lock ${RUNDIR}/$prog.pid
+}
+reload() {
+  	PIDFILE=${RUNDIR}/$prog.pid
+  	LOCKFILE=${LOCKDIR}/$prog.lock
+	echo -n $"Reloading $prog: "
+        start-stop-daemon --signal HUP --stop --oknodo --quiet --pidfile ${PIDFILE} --exec $dbmail
+	RETVAL=$?
+        [ $RETVAL = 0 ] && echo "Restarted $prog with the same PID:"$(cat ${PIDFILE})
+        [ -d ${LOCKDIR} ] && touch ${LOCKFILE} && chown nobody:nogroup ${LOCKFILE}
+	echo
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+        status $dbmail
+	RETVAL=$?
+	;;
+  restart)
+	stop
+	start
+	;;
+  condrestart)
+	if [ -f ${RUNDIR}/$prog.pid ] ; then
+		stop
+		start
+	fi
+	;;
+  reload)
+        reload
+	;;
+  *)
+	echo $"Usage: $prog {start|stop|restart|condrestart|reload|status}"
+	exit 1
+esac
+
+exit $RETVAL
