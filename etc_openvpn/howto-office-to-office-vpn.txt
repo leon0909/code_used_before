@@ -1,0 +1,121 @@
+# needed to be done on the both hosts:
+#
+   apt-get install openvpn
+   
+   cd /usr/share/doc/openvpn/examples/sample-config-files/
+   
+   grep -v \# ./static-office.conf >> /etc/openvpn/vpn.conf 
+   
+   cd /etc/openvpn/ 
+   
+   vi vpn.conf
+
+Server1:                    
+# create the network for the vpn. i.e.:
+
+~# ifconfig eth1 inet 192.168.2.0/24 up
+
+~# openvpn --genkey --secret /etc/openvpn/vpn.key
+
+~# scp /etc/openvpn/vpn.key root@server2:/tmp/ 
+
+
+# .....................................
+# ... vpn.conf
+#
+   
+  # use an openvpn der peer to peer tun devices for this openvpn connection:
+  #
+  dev tun
+
+  # use  this external ip address to connect to peer:
+  #
+  remote 10.150.73.242
+
+  # create the peer to peer tunnel with the tun devices that will use this ip addresses
+  # for their connection:
+  #
+  ifconfig 172.26.10.1 172.26.10.2
+
+  # let us connect to this network of our peer:
+  #
+  route 192.168.222.0 255.255.255.0 172.26.10.2
+
+  # use this port for connection on the both ends:
+  port 3011
+
+  # set the openvpn user und group:
+  #
+  user nobody
+  group nogroup
+
+  # use this openvpn key to encrypt the tunnel data transfer
+  # (needed to be the same on the both hosts)
+  secret /etc/openvpn/vpn.key
+
+  ; comp-lzo
+  ; ping 15
+  ; ping 15
+  ; ping-restart 45
+  ; ping-timer-rem
+  ; persist-tun
+  ; persist-key
+
+  verb 3
+# .....................................
+
+
+Server2:                    
+
+# create the network for the vpn. i.e.:
+
+~# cp /tmp/vpn.key /etc/openvpn/vpn.key 
+
+~# ifconfig eth1 inet 192.168.2.0/24 up
+
+~# vi /etc/openvpn/vpn.conf
+# .....................................
+# ... vpn.conf
+#
+   
+
+  dev tun
+  remote 10.150.98.226
+  
+  # changed ip sequence on the second server:
+  #
+  ifconfig 172.26.10.2 172.26.10.1
+
+  # the other route on the second server because of the different
+  # vpn member network on it:
+  #
+  route 192.168.2.0 255.255.255.0 172.26.10.1
+
+  # the same port on both:
+  port 3011
+
+  user nobody
+  group nogroup
+  
+  # the same key on both:
+  #
+  secret /etc/openvpn/vpn.key
+
+  ; comp-lzo
+  ; ping 15
+  ; ping 15
+  ; ping-restart 45
+  ; ping-timer-rem
+  ; persist-tun
+  ; persist-key
+
+  verb 3
+# .....................................
+
+Server1: ~# service openvpn start ; tail -f /var/log/syslog
+Server2: ~# service openvpn start ; tail -f /var/log/syslog
+
+# if everything fine just ping a private network ip you now 
+# and it schould be now accessible, or connect to its web service ... :)
+
+
