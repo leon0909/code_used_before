@@ -1,0 +1,117 @@
+OpenVPN bridged setup with Debian GNU/Linux
+
+(Taken from http://sven.stormbind.net/misc/tnotes/openvpnbridgedebian.html)
+
+Searching for some documentation on how to configure OpenVPN for a bridged setup with a tap device instead of 
+the routed tun device I found an astonishing amount of helper scripts to setup your bridge. But none of the 
+approaches showed a reasonable example for Debian using /etc/network/interfaces with the helper scripts from 
+the bridge-utils package.
+
+My final setup should look like this:
+
+    Wired LAN: 192.168.88.0/24 - eth0 server side.
+    Range 1-10 for DHCP with dnsmasq.
+    Range 21-30 for the VPN clients, dhcp provided by OpenVPN.
+    Wifi: 192.168.77.0/24 - eth2 server side.
+    DNS will be served by dnsmasq.
+    All traffic should travel through the tunnel. 
+
+Setting up the server
+Install bridgeutils
+
+apt-get install bridge-utils
+This package includes some scripts which enable you to initialize your bridge from /etc/network/interfaces. 
+You can find the documentation in man 5 bridge-utils-interfaces.
+
+Setup the bridge
+
+Edit your /etc/network/interfaces and move the old eth0 configuration to a new br0 interface. 
+The result should look similar to this:
+
+iface br0 inet static
+address 192.168.88.90
+network 192.168.88.0
+netmask 255.255.255.0
+broadcast 192.168.88.255
+bridge_ports eth0 tap0
+pre-up openvpn --mktun --dev tap0
+post-down openvpn --rmtun --dev tap0
+
+Allow your eth0 interface to be hotpluged:
+
+allow-hotplug eth0
+
+And add your newly created bridge to the auto list of interfaces to bring up at boot and whenever else ifup -a is called:
+
+auto lo br0 eth2
+
+Adjust your IP filter setup for the changed interface names and other configuration files which may need to know about 
+the change from eth0 to br0. I'd recomend to try a reboot next and having a serial line or some other kind of out of band
+access at hand in case you missed something critical is helpful here. Afterwards you should be done with the bridge setup
+and you can continue with setting up OpenVPN as usual.
+
+The usual OpenVPN setup:
+
+Copy easy-rsa, generate a CA and the keys.
+
+    cp -a /usr/share/doc/openvpn/examples/easy-rsa/2.0/ $HOME/ovpn-easy-rsa
+    cd $HOME/ovpn-easy-rsa; emacs vars
+    . ./vars; ./clean-all; ./build-ca; ./build-key-server myserver; ./build-dh
+    ./build-key myclient 
+
+My server configuration looks like this - it's still operating with udp and using the very old OpenVPN port:
+
+float
+port 4999
+proto udp
+dev tap0
+ca ca.crt
+cert myserver.crt
+key myserver.key
+dh dh1024.pem
+server-bridge 192.168.88.90 255.255.255.0 192.168.88.21 192.168.88.30
+keepalive 10 120
+comp-lzo
+persist-key
+persist-tun
+status openvpn-status.log
+verb 4
+mute 10
+
+Some dnsmasq tuning
+
+To ensure that there is no DNS traffic traveling through the WLAN outside of the tunnel I had to tweak my dnsmasq setup a bit.
+By default dnsmasq will use the interface IP of the current network where it provides DHCP as IP address for the DNS server. 
+This is something I'd like to avoid. I'd prefer dnsmasq to sent the IP address of the DNS server from the wired LAN interface. 
+So after some searching with Google through some RFCs you'll sooner or later find out that the DNS servers IP address has option 
+number 6 in the DHCP.
+
+For dnsmasq I've added the following line:
+dhcp-option=6,192.168.88.90
+
+to get the desired behaviour. 
+
+Iptables have to be adjusted to let traffic to and from this DNS server pass.
+
+Client configuration:
+(Works on Linux and MacOSX with Tunnelblick.)
+
+client
+dev tap
+proto udp
+port 4999
+remote arthurext.lan 4999
+route-gateway dhcp
+redirect-gateway
+resolv-retry infinite
+persist-key
+persist-tun
+## up script
+#script-security 2
+#up /etc/openvpn/client.up
+ca /etc/openvpn/ca.crt
+cert /etc/openvpn/colin.crt
+key /etc/openvpn/colin.key
+ns-cert-type server
+comp-lzo
+verb 3

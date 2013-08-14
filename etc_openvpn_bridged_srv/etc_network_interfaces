@@ -1,0 +1,29 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+# ........................
+iface lo inet loopback
+
+# ........................
+iface eth0 inet dhcp
+
+# ........................
+allow-hotplug eth1
+iface eth1 inet manual
+
+# ........................
+iface br1 inet static
+	address 192.168.2.1
+	network 192.168.2.0
+	netmask	255.255.255.0
+	broadcast 192.168.2.255
+	bridge-ports eth1 tap0
+        pre-up openvpn --mktun --dev tap0
+        pre-down openvpn --rmtun --dev tap0
+
+# ........................
+auto lo eth0 br1
+
+# ........................
+# END;

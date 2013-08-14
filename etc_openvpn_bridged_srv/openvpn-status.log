@@ -1,0 +1,11 @@
+OpenVPN CLIENT LIST
+Updated,Wed Aug 14 13:28:55 2013
+Common Name,Real Address,Bytes Received,Bytes Sent,Connected Since
+linux-leon.leon.lan,10.150.98.226:4999,490340,1644525,Wed Aug 14 10:46:22 2013
+ROUTING TABLE
+Virtual Address,Common Name,Real Address,Last Ref
+7a:c9:d6:b8:d7:cf,linux-leon.leon.lan,10.150.98.226:4999,Wed Aug 14 10:46:24 2013
+de:d8:49:5a:c1:3c,linux-leon.leon.lan,10.150.98.226:4999,Wed Aug 14 13:27:10 2013
+GLOBAL STATS
+Max bcast/mcast queue length,1
+END
