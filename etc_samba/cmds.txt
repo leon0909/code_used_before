@@ -1,0 +1,32 @@
+    useradd dorothy
+    useradd doerthe
+    useradd dick
+    useradd -s /bin/bash -m leon
+   useradd -s/bin/false -g smbhost leon-xp$
+   useradd -s/bin/false -g smbhost w7-leon$
+   history | grep userad
+   history | grep userad >> cmds.txt
+   smbpasswd -a dorothy
+   smbpasswd -a doerthe
+   smbpasswd -a dick
+   smbpasswd -a leon
+   smbpasswd -a leon
+   history | grep smbpass
+   smbpasswd -am leon-xp
+   smbpasswd -am w7-leon
+   smbpasswd -a root
+   history | grep smbpass
+   history | grep smbpa >> cmds.txt
+   mkdir /home/samba/internal
+   mkdir -p /home/samba/internal
+   mkdir -p /home/samba/public
+   history | grep mkdir
+   mkdir /home/samba-srv
+   history | grep mkdir >> cmds.txt
+   chmod 1777 /home/samba
+   chmod 3777 /home/samba/internal
+   chmod 3775 /home/samba/internal
+   chmod 3775 /home/samba/public
+   chmod 3777 /home/samba/public
+   chmod 1777 /home/samba-srv
+   history | grep chmod >> cmds.txt
