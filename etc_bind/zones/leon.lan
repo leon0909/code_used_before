@@ -1,0 +1,55 @@
+$ORIGIN .
+$TTL 86400	; 1 day
+leon.lan		IN SOA	ns1.leon.lan. postmaster.leon.lan. (
+				2013091011 ; serial
+				86400      ; refresh (1 day)
+				5400       ; retry (1 hour 30 minutes)
+				345600     ; expire (4 days)
+				86400      ; minimum (1 day)
+				)
+			NS	ns1.leon.lan.
+			MX	10 mail.leon.lan.
+$ORIGIN leon.lan.
+$TTL 300	; 5 minutes
+37L4247D28-05		A	192.168.2.38
+			TXT	"31e6a8cd0e1324e1b9b18729bd49dbd54a"
+centos6			A	192.168.2.33
+			TXT	"009c8f3f1440132f5fe0a4c219205faf2a"
+ha-drbd-store1		A	192.168.2.36
+			TXT	"0097111d55f5f7658c53d66cd7044a757f"
+$TTL 86400	; 1 day
+leon-debian		A	192.168.2.1
+$ORIGIN leon-debian.leon.lan.
+www			A	192.168.2.1
+$ORIGIN leon.lan.
+$TTL 300	; 5 minutes
+leon-ldap		A	192.168.2.15
+			TXT	"00e46890bf9a5eec3909858e23291c8ff1"
+leon-ldapII		A	192.168.2.36
+			TXT	"0097111d55f5f7658c53d66cd7044a757f"
+leon-samba		A	192.168.2.14
+			TXT	"00f2f4ed3a42e5eb956c92a60bdae5c60d"
+leon-xp			A	192.168.2.31
+			TXT	"31eed8ff32d3ef1754111dbe79d09ff4db"
+linux-leon		A	192.168.2.150
+			TXT	"007d419b128a57dc99f84d9bc1309ddb50"
+$TTL 86400	; 1 day
+mail			A	192.168.2.1
+nagios			A	192.168.2.1
+ns1			A	192.168.2.1
+$TTL 300	; 5 minutes
+proxmox-ve		A	192.168.2.44
+			TXT	"00d163238f8716df9f728707cf9bb998c1"
+$TTL 3600	; 1 hour
+suse9-ldap		A	192.168.2.46
+			TXT	"3143fc1c5d9ab7dfe4973b6323fdd38916"
+suse9-ldapR		A	192.168.2.47
+			TXT	"31833b27c6c928e5f7699bf9ac9cffc959"
+$TTL 300	; 5 minutes
+ubu-chef		A	192.168.2.134
+			TXT	"00e833aa5dbe900101287bee590f7a16e1"
+$TTL 86400	; 1 day
+w1			A	192.168.2.2
+$TTL 300	; 5 minutes
+w7-leon			A	192.168.2.37
+			TXT	"317c99c3a1e813c59ba6606cf897759139"

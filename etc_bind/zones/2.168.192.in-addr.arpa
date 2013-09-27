@@ -1,0 +1,35 @@
+$ORIGIN .
+$TTL 86400	; 1 day
+2.168.192.in-addr.arpa	IN SOA	ns1.leon.lan. leon.leon.lan. (
+				2013081526 ; serial
+				86400      ; refresh (1 day)
+				5400       ; retry (1 hour 30 minutes)
+				345600     ; expire (4 days)
+				300        ; minimum (5 minutes)
+				)
+			NS	ns1.leon.lan.
+$ORIGIN 2.168.192.in-addr.arpa.
+$TTL 1	; 1 second
+1			PTR	ns1.leon.lan.
+			PTR	mail.leon.lan.
+			PTR	debian-leon.leon.lan.
+$TTL 300	; 5 minutes
+134			PTR	ubu-chef.leon.lan.
+14			PTR	leon-samba.leon.lan.
+15			PTR	leon-ldap.leon.lan.
+150			PTR	linux-leon.leon.lan.
+31			PTR	leon-xp.leon.lan.
+33			PTR	centos6.leon.lan.
+35			PTR	proxmox-ve.leon.lan.
+36			PTR	leon-ldapII.leon.lan.
+37			PTR	W7-LEON.leon.lan.
+38			PTR	37L4247D28-05.leon.lan.
+39			PTR	W7-LEON.DOMDARSI.
+41			PTR	linux-leon.leon.lan.
+42			PTR	W7-LEON.DOMDARSI.
+44			PTR	proxmox-ve.leon.lan.
+$TTL 3600	; 1 hour
+46			PTR	suse9-ldap.leon.lan.
+47			PTR	suse9-ldapR.leon.lan.
+$TTL 300	; 5 minutes
+50			PTR	linux-leon.leon.lan.

@@ -1,0 +1,43 @@
+//................................................
+include "/etc/bind/tsig/ddns.key";
+//................................................
+zone "leon.lan" {
+  type master;
+  file "/etc/bind/zones/leon.lan";
+//................................................
+//  file "/etc/bind/zones/leon.lan.signed";
+//  allow-transfer {
+//    slaves; see the alias definition in named.conf.aliases
+//    };
+//  also-notify {
+//    0.0.0.0; put your slaves and cahcing servers of your provider here
+//    };
+//................................................
+  allow-query { 
+    any; 
+    };
+//................................................
+  notify no;
+//................................................
+  allow-update { 
+    key DDNS_KEY; 
+    };
+  };
+
+zone "2.168.192.in-addr.arpa" {
+  type master;
+  file "/etc/bind/zones/2.168.192.in-addr.arpa";
+//................................................
+  allow-query { 
+    any; 
+    };
+//................................................
+  notify no;
+//................................................
+  allow-update { 
+    key DDNS_KEY; 
+    };
+  }; 
+
+//................................................
+// EOF;
