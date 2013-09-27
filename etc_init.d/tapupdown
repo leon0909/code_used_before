@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+
+### BEGIN INIT INFO
+# Provides:          tapupdown
+# Required-Start:    $syslog $network openvpn
+# Required-Stop:     mysql apache nginx slapd
+# Should-Start:      $syslog $network vboxtoolinit openvpn 
+# Should-Stop:       vboxtoolinit 
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Last step in a openvpn procedure provides dhcp address for a road warior interface.
+# Description:       Provides dhcp ip from the network of openvpn server 
+### END INIT INFO
+
+#
+#
+#
+#
+ # Variables:
+ # ................................
+ RED='\033[01;31m'
+ GREEN='\033[01;32m'
+ CEND='\033[00m'
+ # ................................
+ NIC=$2
+ OPENVPN_NET='192.168.2'
+ 
+ # Control Structures:
+ # ................................
+ [ -z "$NIC" ] && NIC=tap0
+ 
+ # Functions:
+ # ................................
+ function dhclient_up {
+    NIC=$1
+    echo "calling dhclient 4 $NIC interface"  
+    dhclient $NIC
+    }
+
+ # ................................
+ function dhclient_down {
+    NIC=$1
+    echo "calling dhclient 4 -n $NIC interface"  
+    dhclient -r $NIC
+    }
+
+ # Control Structures:
+ # ................................
+ case $1 in 
+    start| Start | START )
+         # service openvpn should already bring up its tap interface
+         # its no go further until .............................
+         #
+      ip a s
+      while [ -z "$( ip a s | grep $NIC\. )" ]; do 
+         echo -e $GREEN 
+         echo -n "->"$NIC"<- isn't up yet... "
+         echo -e $CEND
+         echo -e $RED"waiting for openvpn to bring the $NIC device up..."$CEND
+         sleep 3
+         done
+      # ........................................................   
+      echo -e $GREEN"safely starting dhclient on tap0"$CEND 
+      [ -n "$( ip a s | grep $OPENVPN_NET )" ] || dhclient_up $NIC
+      ip a s
+      sleep 2
+      ;;
+ 
+    stop| Stop | STOP )
+       echo -e $GREEN"sending release dhclient on tap0"$CEND
+       [ -z "$( ip a s | grep $OPENVPN_NET )" ] || dhclient_down $NIC
+       ;;
+ 
+    * )
+       echo -e $RED
+       echo -e "to call this init script for tap0, please use this form:"$CEND 
+       echo "$0 < stop | start >"
+       echo -e $RED
+       echo -e "to call this init script for some other device  please use this form:"$CEND
+       echo "$0 < stop | start > < eth%Nr%| tap%Nr% >"
+       echo
+       exit
+       ;;
+   esac
+
+exit   
+# ............................EOF;
