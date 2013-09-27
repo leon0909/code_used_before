@@ -61,6 +61,13 @@ Copy easy-rsa, generate a CA and the keys.
 
 My server configuration looks like this - it's still operating with udp and using the very old OpenVPN port:
 
+# ................
+## config it like this if you don't want to use 
+#  a openvpn-server based dhcp-server served addresses 
+# for your clients. Otherwise look into the supplied
+# etc_openvpn_bridged_server/vpn-bridged.conf directory and configure 
+# like it is shown there.
+#
 float
 port 4999
 proto udp
@@ -77,6 +84,8 @@ persist-tun
 status openvpn-status.log
 verb 4
 mute 10
+
+# ................
 
 Some dnsmasq tuning
 
