@@ -1,0 +1,89 @@
+
+[global]
+   # ...................
+   log level = 3
+   workgroup = DOMDARSI
+   # ... An Option that creates an NT Domain Controller:
+   domain logons = yes
+   # ... ^^^;
+   domain master = yes
+   # admin users = root
+
+   # ... Weitere Domänen optionen ...
+   security = user
+   encrypt passwords = true
+   # ...................
+   map to guest = Bad User
+   # ... WINS Master
+   wins support = yes
+   local master = yes
+   prefered master = yes
+   os level = 65
+   # ...................
+   logon drive = M:
+   logon path = //%h/profiles/%U
+   # ...................
+   server string = DPC_Master
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+   syslog = 0
+   printing = cups
+   idmap config * : range = 15000-20000
+   idmap config * : backend = tdbsam
+   # ...................
+   interfaces = lo, eth1
+   
+[netlogon]
+   comment = Network Logon Service
+   path = /var/spool/samba/netlogon 
+   create mask = 0644
+   guest ok = yes
+   read only = yes
+
+[profiles]
+   comment = Users profiles
+   path = /var/spool/samba
+   read only = no
+   browseable = no
+   create mask = 0744
+   directory mask = 0775
+
+[homes]
+   comment = Home Directories
+   browseable = no
+   read only = no
+
+[INT_SHARES]
+   comment = "Shares inside the enterprise"     
+   path = /home/samba/internal
+   read only = no
+   create mask = 0640
+   directory mask = 0750
+   # valid users = %S
+   valid users = @smbuser
+   
+[PUB_SHARES]
+   comment = "Anonymouse access shares"     
+   path = /home/samba/public
+   create mask = 0644
+   directory mask = 0750
+   read only = no
+   guest ok = yes
+
+[printers]
+   comment = All Printers
+   browseable = no
+   path = /var/spool/samba
+   printable = yes
+   guest ok = no
+   read only = yes
+   create mask = 0700
+
+[print$]
+   comment = Printer Drivers
+   path = /var/lib/samba/printers
+   browseable = yes
+   read only = yes
+   guest ok = no
+;   write list = root, @lpadmin
+
