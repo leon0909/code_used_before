@@ -49,7 +49,10 @@ start()
 {
   # 'vboxtoolinit start' maps to 'vboxtool autostart'; when the host boots, all sessions in 
   # the config file /etc/vboxtool/machines.conf are started
-  mkdir -p /var/log/vboxtool
+  log_dir=/var/log/vboxtool
+  mkdir -p $log_dir
+  chmod 1775 $log_dir
+  chown .$vbox_user $log_dir
   cd /var/log/vboxtool && nohup $su_command "$tool autostart" 
 }
 
