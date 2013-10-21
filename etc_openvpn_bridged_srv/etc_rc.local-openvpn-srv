@@ -1,0 +1,59 @@
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+
+
+# getting the not connected eth1 interface up for the use as an internal networ switch
+# see my bridge configuration in the /etc/network/interfaces
+# (needed to install the bridge-utils package for this)
+#
+# [ -n "$( ip link show br1 | grep '00:22:19:2a:51:21' )" ] || ip link set eth1 up
+
+# enableing the ipv4forward option in the /proc/sys 
+# of this system to let this host serve as a router
+#
+#
+
+# Reset the configuration of eth1 device if content of /etc/resolv isn't satisfying
+#  
+ [ -z "$(grep leon.lan /etc/resolv.conf)" ] && ifdown eth1 && ifup eth1
+
+# Our system is going to be a router if it not already is:
+#
+ [ -n "$( grep '1' /proc/sys/net/ipv4/ip_forward)" ] || echo "1" > /proc/sys/net/ipv4/ip_forward
+
+# setting the POPSTROUTING MASQUERADE NAT option to let this host serve as a router
+#
+
+ if [ -z "$( iptables -t nat -L | grep PREROUTING | egrep 'INPUT|OUTPUT|FORWARD' )" ]; then
+        echo "No Iptables NAT rules found. - setting  them now ...: "   
+        # .............................
+        #
+        iptables -t nat -A PREROUTING -p udp --dport 4999 -j ACCEPT 
+        iptables -t nat -A INPUT -p udp --dport 4999 -j ACCEPT
+        # .............................
+        iptables -I INPUT -i tap0 -j ACCEPT
+        iptables -I FORWARD -i tap0 -j ACCEPT
+        iptables -I OUTPUT -o tap0 -j ACCEPT
+        iptables -I FORWARD -o tap0 -j ACCEPT
+        # .............................
+    fi
+#
+ if [ -z "$( iptables -t nat -L | grep MASQUERADE )" ]; then
+    iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    /sbin/iptables --append FORWARD --in-interface eth1 -j ACCEPT
+    fi
+
+echo "Iptables NAT settings:"
+iptables -t nat -L
+
+exit 0
