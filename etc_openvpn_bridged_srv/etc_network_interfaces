@@ -9,6 +9,7 @@ iface lo inet loopback
 iface eth0 inet dhcp
 
 # ........................
+# konnection with an outer world:
 allow-hotplug eth2
 iface eth2 inet manual
 
@@ -17,8 +18,17 @@ iface eth1 inet static
 	address 192.168.2.1
 	network 192.168.2.0
 	netmask	255.255.255.0
+	# ... set the nameserver running on the openvpn server as default:
+        post-up ruby -e '["search leon.lan", "nameserver 192.168.2.1"].each { |m| puts m }' > /etc/resolv.conf
+        post-down ruby -e '["search christ.mas", "nameserver 10.150.0.1"].each { |m| puts m }' > /etc/resolv.conf
+
+iface eth1:0 inet static
+	address 192.168.2.2
+	network 192.168.2.0
+	netmask	255.255.255.0
 # ........................
-#iface br1 inet dhcp
+# iface br1 inet dhcp
+# das openvpn interface:
 iface br1 inet static
 	address 192.168.3.30
 	network 192.168.3.0
@@ -26,6 +36,8 @@ iface br1 inet static
 	broadcast 192.168.3.255
 	bridge-ports eth2 tap0
 	# ........................
+	# ... an IP nated rule work with the rediracting ARP packages 
+	# ... as well as with TCP-IP, which is usefull for DHCP tunneling :
         pre-up openvpn --mktun --dev tap0
         post-up ip route add nat 192.168.2.0/24 via 192.168.3.30 
         post-up ip rule add nat 192.168.2.0/24 from 192.168.3.30 
@@ -40,7 +52,7 @@ iface br1 inet static
 	# ........................
 
 # ........................
-auto lo eth1 br1 eth0 
+auto lo eth1 eth1:0 br1 eth0 
 
 # ........................
 # END;
