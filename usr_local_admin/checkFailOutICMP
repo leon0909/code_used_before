@@ -8,7 +8,7 @@
 
 # .............................................../
 CIRCLE_MEMBERS='62.241.61.17 141.80.163.160 141.80.13.42'
-WEBMASTERS='leonid.heidt@gmx.net leonid.heidt@$YOUR_FQDN clemens.webert@mdc-berlin.de clemens.webert@$YOUR_FQDN'
+WEBMASTERS='leonid.heidt@gmx.net leonid.heidt@$YOUR_FQDN clemens.webert@fqdn.net clemens.webert@$YOUR_FQDN'
 MESSAGE_TIME=$(date)
 ME=$(ifconfig | grep "inet addr" | grep -v 127.0 | awk '-F:' '{print $2}' | awk '{print $1}')
 [[ ${ME} = '' ]] && ME=$(ifconfig | grep "inet Adr" | grep -v 127.0 | awk '-F:' '{print $2}' | awk '{print $1}')
